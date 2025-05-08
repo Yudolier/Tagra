@@ -91,3 +91,11 @@ canvas {
   border-left: 1px solid #ccc;
   padding: 10px;
 }
+.layer-item {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.layer-item:hover {
+  background-color: #eee;
+}
