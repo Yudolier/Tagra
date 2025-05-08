@@ -81,14 +81,15 @@ class Layer {
     this.name = name;
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d");
+    this.visible = true;
   }
 }
-
 function addLayer(wrapper, layers) {
   const index = layers.length + 1;  // ← 今から追加されるレイヤー番号 0番目が1
   const layer = new Layer(`Layer ${index}`);  //スコープok!
   layer.canvas.style.zIndex = index;
   wrapper.appendChild(layer.canvas);
+
 
     // ★ 追加： wrapper と同じピクセル解像度を設定
     const { clientWidth:w, clientHeight:h } = wrapper;
@@ -97,6 +98,131 @@ function addLayer(wrapper, layers) {
   layers.push(layer);
   return layer;
 }
+class LayerManager {
+  constructor(wrapper) {
+    this.wrapper = wrapper;
+    this.cursorCanvas = document.getElementById("cursorCanvas");
+    this.layers = [];
+    this.AI = 0;
+    this.nextId = 1; // 名前が被らないようにする
+  }
+
+  addLayer(name = `Layer ${this.nextId++}`) {
+    const layer = new Layer(name);
+    const { clientWidth: w, clientHeight: h } = this.wrapper;
+    layer.canvas.width = w;
+    layer.canvas.height = h;
+    layer.canvas.style.zIndex = this.layers.length + 1;
+    layer.canvas.style.position = "absolute";
+    layer.canvas.style.top = "0";
+    layer.canvas.style.left = "0";
+    this.wrapper.appendChild(layer.canvas);
+
+    applyBrushStyle(layer.ctx);
+    setupEvents(layer);
+    attachDrawEvents(layer);
+
+    this.layers.push(layer);
+    this.AI = this.layers.length - 1;  //レイヤー1のAIは0
+    return layer;
+  }
+
+  getActiveLayer() {
+    return this.layers[this.AI] ?? null;
+  }
+
+  setActive(index) {
+    if (index >= 0 && index < this.layers.length) {
+      this.AI = index;
+    }
+  }
+
+  removeLayer(index) {
+    if (this.layers.length <= 1) {
+      alert("レイヤーを0枚にすることはできません。");
+      return false;
+    }
+
+    const layer = this.layers[index];
+    if (!layer) return false;
+
+    detachDrawEvents(layer);
+    this.wrapper.removeChild(layer.canvas);
+    this.layers.splice(index, 1);
+
+    if (this.AI >= this.layers.length) {
+      this.AI = this.layers.length - 1;
+    }
+
+    return true;
+  }
+
+  renameLayer(index, newName) {
+    const layer = this.layers[index];
+    if (layer) {
+      layer.name = newName;
+    }
+  }
+
+  toggleVisibility(index) {
+    const layer = this.layers[index];
+    if (layer) {
+      layer.visible = !layer.visible;
+      layer.canvas.style.display = layer.visible ? "block" : "none";
+    }
+  }
+
+  duplicateLayer(index) {
+    const original = this.layers[index];
+    if (!original) return null;
+
+    const newLayer = new Layer(`${original.name} copy`);
+    newLayer.canvas.width = original.canvas.width;
+    newLayer.canvas.height = original.canvas.height;
+    newLayer.ctx.drawImage(original.canvas, 0, 0);
+
+    newLayer.canvas.style.zIndex = this.layers.length + 1;
+    newLayer.canvas.style.position = "absolute";
+    newLayer.canvas.style.top = "0";
+    newLayer.canvas.style.left = "0";
+    this.wrapper.appendChild(newLayer.canvas);
+
+    applyBrushStyle(newLayer.ctx);
+    setupEvents(newLayer);
+    attachDrawEvents(newLayer);
+
+    this.layers.push(newLayer);
+    this.AI = this.layers.length - 1;
+    return newLayer;
+  }
+
+  moveLayer(index, direction) {
+    const swapWith = direction === "up" ? index + 1 : index - 1;
+    if (swapWith < 0 || swapWith >= this.layers.length) return;
+
+    [this.layers[index], this.layers[swapWith]] = [this.layers[swapWith], this.layers[index]];
+    this.renderZIndex();
+    this.AI = swapWith;
+  }
+
+  renderZIndex() {
+    this.layers.forEach((layer, i) => {
+      layer.canvas.style.zIndex = i + 1;
+    });
+  }
+
+  getLayerList() {
+    return this.layers.map((layer, index) => ({
+      index,
+      name: layer.name,
+      visible: layer.visible ?? true,
+      active: index === this.AI,
+    }));
+  }
+}
+
+
+
 
 function applyBrushStyle(ctx){
   ctx.lineCap = "round";
@@ -270,9 +396,6 @@ alphaInput.addEventListener('input', () => {
   alphaDisplay.textContent = alphaInput.value;
   updateBrushColor();
 });
-
-// 初期化時に1回呼ぶ（関数を記述しただけだと呼ばれないよ）
-updateBrushColor();
 
 //キャンパスサイズを変更するスクリプト。wrapperに依存。フォルダ実装時にいじる必要あり。
 function resizeCanvases() {
