@@ -1,0 +1,31 @@
+@charset "UTF-8";
+* { /*初期化*/
+	margin: 0px; /* 外余白0px */
+	padding: 0px; /* 内余白0px */
+	border-width: 0px; /* 枠線0px */
+	text-decoration: none; /* 文字装飾なし */
+	font-size: 20px; /* 文字サイズ20px */
+}
+hr {
+	border: none;              /* デフォルトの線をリセット */
+	border-top: 2px dotted #000000; /* 上だけ線を引く（グレー） */
+	margin: 1em 0;             /* 上下に余白 */
+}
+
+canvas {
+    border:  1px solid #000;
+    display: block;
+    margin: 20px auto;
+}
+#color-preview {                /*idがcolor-previewのものに適用*/
+    width: 40px;
+    height: 40px;
+    border: 0px solid #000000;
+}
+#color-block {
+    align-items: flex-start;
+    gap: 10px;
+    background-color: white;
+}
+
+  

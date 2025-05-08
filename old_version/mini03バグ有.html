@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>TaGra Mini v4 — バグ修正版</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; height: 100vh; }
+    #left { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px; box-sizing: border-box; }
+    #canvasContainer { position: relative; width: 800px; height: 600px; border: 1px solid #666; box-sizing: border-box; touch-action: none; background: #fff; }
+    #canvasContainer canvas { position: absolute; top: 0; left: 0; }
+    #controls { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    #controls button { padding: 4px 8px; }
+    #controls label { font-size: 14px; display: flex; align-items: center; gap: 4px; }
+    #layerPanel { width: 260px; border-left: 1px solid #ccc; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; }
+    #layerPanel h2 { margin-top: 0; }
+    #addLayer { margin-bottom: 8px; padding: 6px; font-size: 14px; flex-shrink: 0; }
+    #layerList { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+    #layerList li { display: flex; align-items: center; margin-bottom: 6px; padding: 4px; border: 1px solid #aaa; border-radius: 4px; cursor: pointer; overflow: hidden; }
+    #layerList li.active { background: #eef; border-color: #48f; }
+    #layerList li input.name { flex: 1 1 auto; min-width: 0; margin: 0 4px; border: 1px solid #ccc; padding: 2px 4px; font-size: 13px; }
+    #layerList li button.del { flex: 0 0 auto; background: #f44; border: none; color: white; width: 20px; height: 20px; font-size: 14px; border-radius: 2px; margin-left: 4px; }
+    #layerList li canvas.preview { width: 60px; height: 45px; border: 1px solid #666; margin-right: 4px; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <div id="canvasContainer"></div>
+    <div id="controls">
+      <button id="fillBtn">塗りつぶし</button>
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+      <button id="eraserBtn">消しゴムに切替</button>
+      <label>線の太さ:<input type="range" id="brushSize" min="1" max="50" value="5"><span id="brushSizeVal">5</span>px</label>
+      <label style="border:1px solid #ccc; padding:4px; border-radius:4px;">
+        <span>色設定:</span>
+        R<input type="range" id="r" min="0" max="255" value="0">
+        G<input type="range" id="g" min="0" max="255" value="0">
+        B<input type="range" id="b" min="0" max="255" value="0">
+        A<input type="range" id="a" min="0" max="1" step="0.01" value="1">
+        <span id="colorPreview" style="display:inline-block;width:18px;height:18px;border:1px solid #000;vertical-align:middle;background:rgba(0,0,0,1);"></span>
+      </label>
+    </div>
+  </div>
+  <div id="layerPanel">
+    <h2>レイヤー</h2>
+    <button id="addLayer">＋ レイヤー追加</button>
+    <ul id="layerList"></ul>
+  </div>
+<script>
+(() => {
+  const container = document.getElementById('canvasContainer');
+  const layerListEl = document.getElementById('layerList');
+  const addLayerBtn = document.getElementById('addLayer');
+  const fillBtn = document.getElementById('fillBtn');
+  const eraserBtn = document.getElementById('eraserBtn');
+  const brushSizeInput = document.getElementById('brushSize');
+  const brushSizeVal = document.getElementById('brushSizeVal');
+  const rInput = document.getElementById('r');
+  const gInput = document.getElementById('g');
+  const bInput = document.getElementById('b');
+  const aInput = document.getElementById('a');
+  const colorPreview = document.getElementById('colorPreview');
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+
+  let layers = [];
+  let active = 0;
+  let isDrawing = false;
+  let isFill = false;
+  let brushSize = +brushSizeInput.value;
+  let brushColor = 'rgba(0,0,0,1)';
+
+  addLayer();
+  addLayerBtn.onclick = addLayer;
+  fillBtn.onclick = toggleFill;
+  eraserBtn.onclick = toggleEraser;
+  brushSizeInput.oninput = () => { brushSize = +brushSizeInput.value; brushSizeVal.textContent = brushSize; };
+  [rInput,gInput,bInput,aInput].forEach(el => el.oninput = updateColor);
+  undoBtn.onclick = undo;
+  redoBtn.onclick = redo;
+
+  function updateColor() {
+    const r = +rInput.value, g = +gInput.value, b = +bInput.value, a = +aInput.value;
+    brushColor = `rgba(${r},${g},${b},${a})`;
+    colorPreview.style.background = brushColor;
+  }
+
+  function addLayer() {
+    const idx = layers.length;
+    const cvs = document.createElement('canvas');
+    cvs.width = 800;
+    cvs.height = 600;
+    cvs.style.zIndex = idx;
+    container.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const history = [];
+    let historyIndex = -1;
+    layers.push({ canvas: cvs, ctx, name: `Layer ${idx}`, history, historyIndex });
+    attachEvents(cvs);
+    saveHistory();
+    renderUI();
+  }
+
+  function deleteLayer(i) {
+    if (layers.length <= 1) return;
+    container.removeChild(layers[i].canvas);
+    layers.splice(i, 1);
+    if (active >= layers.length) active = layers.length - 1;
+    renderUI();
+  }
+
+  function renameLayer(i, name) {
+    layers[i].name = name;
+    renderUI();
+  }
+
+  function switchLayer(i) {
+    active = i;
+    isDrawing = false;
+    renderUI();
+  }
+
+  function toggleFill() {
+    isFill = !isFill;
+    fillBtn.textContent = isFill ? '描画モードに切替' : '塗りつぶし';
+    isDrawing = false;
+  }
+
+  function toggleEraser() {
+    const mode = layers[active].ctx.globalCompositeOperation === 'destination-out' ? 'source-over' : 'destination-out';
+    layers.forEach(l => l.ctx.globalCompositeOperation = mode);
+    eraserBtn.textContent = mode === 'destination-out' ? 'ペンに切替' : '消しゴムに切替';
+    isDrawing = false;
+  }
+
+  function attachEvents(cvs) {
+    cvs.addEventListener('pointerdown', e => {
+      const rect = cvs.getBoundingClientRect();
+      const scaleX = cvs.width / rect.width;
+      const scaleY = cvs.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      if (x < 0 || y < 0 || x >= cvs.width || y >= cvs.height) return;
+      const { ctx } = layers[active];
+      if (isFill) {
+        ctx.fillStyle = brushColor;
+        ctx.fillRect(0, 0, cvs.width, cvs.height);
+        saveHistory();
+        return;
+      }
+      isDrawing = true;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    });
+
+    cvs.addEventListener('pointermove', e => {
+      if (!isDrawing) return;
+      const rect = cvs.getBoundingClientRect();
+      const scaleX = cvs.width / rect.width;
+      const scaleY = cvs.height / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      if (x < 0 || y < 0 || x >= cvs.width || y >= cvs.height) { endDraw(); return; }
+      const { ctx } = layers[active];
+      const pressure = e.pressure > 0 ? e.pressure : 1;
+      ctx.lineWidth = brushSize * pressure;
+      ctx.strokeStyle = brushColor;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    });
+
+    cvs.addEventListener('pointerup', endDraw);
+    cvs.addEventListener('pointerleave', endDraw);
+  }
+
+  function endDraw() {
+    if (!isDrawing) return;
+    isDrawing = false;
+    saveHistory();
+  }
+
+  function saveHistory() {
+    const L = layers[active];
+    const img = L.ctx.getImageData(0, 0, L.canvas.width, L.canvas.height);
+    L.history.splice(L.historyIndex + 1);
+    L.history.push(img);
+    L.historyIndex++;
+    if (L.history.length > 50) { L.history.shift(); L.historyIndex--; }
+  }
+
+  function undo() {
+    const L = layers[active];
+    if (L.historyIndex > 0) {
+      L.historyIndex--;
+      L.ctx.putImageData(L.history[L.historyIndex], 0, 0);
+      renderUI();
+    }
+  }
+
+  function redo() {
+    const L = layers[active];
+    if (L.historyIndex < L.history.length - 1) {
+      L.historyIndex++;
+      L.ctx.putImageData(L.history[L.historyIndex], 0, 0);
+      renderUI();
+    }
+  }
+
+  function renderUI() {
+    layers.forEach((l, i) => l.canvas.style.zIndex = (i === active ? 2 : 1));
+    layerListEl.innerHTML = '';
+    layers.forEach((l, i) => {
+      const li = document.createElement('li');
+      if (i === active) li.classList.add('active');
+      const pre = document.createElement('canvas'); pre.width = 80; pre.height = 60; pre.className = 'preview';
+      pre.getContext('2d').drawImage(l.canvas, 0, 0, 80, 60);
+      li.appendChild(pre);
+      const inp = document.createElement('input'); inp.type = 'text'; inp.value = l.name; inp.className = 'name';
+      inp.onchange = () => renameLayer(i, inp.value);
+      li.appendChild(inp);
+      const btn = document.createElement('button'); btn.textContent = '×'; btn.className = 'del';
+      btn.onclick = e => { e.stopPropagation(); deleteLayer(i); };
+      li.appendChild(btn);
+      li.onclick = () => switchLayer(i);
+      layerListEl.appendChild(li);
+    });
+  }
+})();
+</script>
+</body>
+</html>
