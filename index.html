@@ -13,11 +13,13 @@
 <body>
   <p id="title">TaGra-mini</p>
   <!--キャンバス-->
+  <div id="container">
   <div id="canvas-wrapper">
-    <!-- drawCanvas はlayer[aI].canvasに移行しました（動的に追加するので） -->
-    <!-- cursorCanvas は残す（プレビュー表示専用） -->
-    <canvas id="cursorCanvas">キャンバス</canvas>
+    <!-- drawCanvas はlayer[aI].canvasに。動的に追加する-->
   </div>
+  <!-- cursorCanvasを最前面で独立させる-->
+  <canvas id="cursorCanvas">カーソルキャンバス</canvas>
+</div>
   <hr>
   <!-- 線の太さ調整スライダー/inputとはユーザーからの入力を受け付けるもの -->
   <div id="brush-size">
@@ -73,6 +75,7 @@ const cursorCtx = cursorCanvas.getContext("2d");
     let lastY = 0;
 //レイヤーをclassにする
 //name以外は勝手に決まる（layer.canvasとかで引き出せる）
+//Layerはname(という文字列),canvas,ctxからなるオブジェクトになる！
 class Layer {
   constructor(name) {
     this.name = name;
@@ -80,11 +83,12 @@ class Layer {
     this.ctx = this.canvas.getContext("2d");
   }
 }
+
 function addLayer(wrapper, layers) {
   const index = layers.length + 1;  // ← 今から追加されるレイヤー番号 0番目が1
   const layer = new Layer(`Layer ${index}`);  //スコープok!
   layer.canvas.style.zIndex = index;
-  wrapper.insertBefore(layer.canvas, cursorCanvas);
+  wrapper.appendChild(layer.canvas);
 
     // ★ 追加： wrapper と同じピクセル解像度を設定
     const { clientWidth:w, clientHeight:h } = wrapper;
@@ -93,9 +97,6 @@ function addLayer(wrapper, layers) {
   layers.push(layer);
   return layer;
 }
-//baseLayer = addLayer(wrapper,layers)  //まあいいんだけど、cursorCanvasがなんらかの理由で呼ばれてないとバグるらしい
-//baseLayer.ctx.lineCap = "round";
-//baseLayer.ctx.lineJoin = "round";
 
 function applyBrushStyle(ctx){
   ctx.lineCap = "round";
@@ -159,7 +160,7 @@ eraserIncreaseBtn.addEventListener('click', () => {
   eraserSizeDisplay.textContent = v;
   if (isErasing) layers[activeIndex].ctx.lineWidth = v;
 });
-//ここから描くよ！
+
 // イベントリスナーの処理を layer オブジェクトにひもづけて切り出す
 function setupEvents(layer) {
   const canvas = layer.canvas;
@@ -273,7 +274,7 @@ alphaInput.addEventListener('input', () => {
 // 初期化時に1回呼ぶ（関数を記述しただけだと呼ばれないよ）
 updateBrushColor();
 
-//キャンパスサイズを変更するスクリプト
+//キャンパスサイズを変更するスクリプト。wrapperに依存。フォルダ実装時にいじる必要あり。
 function resizeCanvases() {
   const wrapper = document.getElementById('canvas-wrapper');
   const width = wrapper.clientWidth;
@@ -284,6 +285,9 @@ function resizeCanvases() {
     canvas.width = width;   // 描画解像度の設定（これがないとボケる）
     canvas.height = height;
   });
+  cursorCanvas.width = wrapper.clientWidth;
+  cursorCanvas.height = wrapper.clientHeight;
+
 }
 //この中はhtmlとcssが読み込み終了してから動く
 
