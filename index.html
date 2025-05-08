@@ -13,12 +13,15 @@
 <body>
   <p id="title">TaGra-mini</p>
   <!--キャンバス-->
-  <div id="container">
+<div id="workspace">
+    <div id="container">
   <div id="canvas-wrapper">
     <!-- drawCanvas はlayer[aI].canvasに。動的に追加する-->
   </div>
   <!-- cursorCanvasを最前面で独立させる-->
   <canvas id="cursorCanvas">カーソルキャンバス</canvas>
+</div>
+<div id="layer-panel"></div>
 </div>
   <hr>
   <!-- 線の太さ調整スライダー/inputとはユーザーからの入力を受け付けるもの -->
@@ -146,7 +149,7 @@ class LayerManager {
     const layer = this.layers[index];
     if (!layer) return false;
 
-    detachDrawEvents(layer);
+    detachDrawEvents(layer);  //バグらせないために必要な処理
     this.wrapper.removeChild(layer.canvas);
     this.layers.splice(index, 1);
 
@@ -174,7 +177,11 @@ class LayerManager {
 
   duplicateLayer(index) {
     const original = this.layers[index];
-    if (!original) return null;
+    if (!original) {
+    alert(`指定されたレイヤー（index: ${index}）が見つかりませんでした。複製できません。`);
+    console.error(`duplicateLayer: index ${index} が無効です。layers.length = ${this.layers.length}`);
+    return null;
+  }
 
     const newLayer = new Layer(`${original.name} copy`);
     newLayer.canvas.width = original.canvas.width;
@@ -287,12 +294,11 @@ eraserIncreaseBtn.addEventListener('click', () => {
   if (isErasing) layers[activeIndex].ctx.lineWidth = v;
 });
 
-// イベントリスナーの処理を layer オブジェクトにひもづけて切り出す
+// イベントリスナーの処理はlayerごとに呼び出すことが必要
 function setupEvents(layer) {
   const canvas = layer.canvas;
   const ctx    = layer.ctx;
 
-  // イベントリスナーの処理を関数として切り出す
   canvas._onMouseDown = function(e){
     // 押された時に書いてるよとフラグを立てる
     isDrawing = true;
