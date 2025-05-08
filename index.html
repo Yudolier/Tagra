@@ -92,8 +92,6 @@ function addLayer(wrapper, layers) {
   const layer = new Layer(`Layer ${index}`);  //スコープok!
   layer.canvas.style.zIndex = index;
   wrapper.appendChild(layer.canvas);
-
-
     // ★ 追加： wrapper と同じピクセル解像度を設定
     const { clientWidth:w, clientHeight:h } = wrapper;
   layer.canvas.width  = w;
@@ -127,6 +125,7 @@ class LayerManager {
 
     this.layers.push(layer);
     this.AI = this.layers.length - 1;  //レイヤー1のAIは0
+    this.renderLayerPanel();
     return layer;
   }
 
@@ -137,12 +136,15 @@ class LayerManager {
   setActive(index) {
     if (index >= 0 && index < this.layers.length) {
       this.AI = index;
+      this.renderLayerPanel();
+    }else{
+      alert("エラー：無効な値です。");
     }
   }
 
   removeLayer(index) {
     if (this.layers.length <= 1) {
-      alert("レイヤーを0枚にすることはできません。");
+      alert("エラー：レイヤーを0枚にすることはできません。");
       return false;
     }
 
@@ -156,7 +158,7 @@ class LayerManager {
     if (this.AI >= this.layers.length) {
       this.AI = this.layers.length - 1;
     }
-
+    this.renderLayerPanel();
     return true;
   }
 
@@ -164,6 +166,7 @@ class LayerManager {
     const layer = this.layers[index];
     if (layer) {
       layer.name = newName;
+      this.renderLayerPanel();
     }
   }
 
@@ -200,6 +203,7 @@ class LayerManager {
 
     this.layers.push(newLayer);
     this.AI = this.layers.length - 1;
+    this.renderLayerPanel();
     return newLayer;
   }
 
@@ -210,14 +214,16 @@ class LayerManager {
     [this.layers[index], this.layers[swapWith]] = [this.layers[swapWith], this.layers[index]];
     this.renderZIndex();
     this.AI = swapWith;
+    this.renderLayerPanel();
   }
-
+//各レイヤーの z-index を、配列の順番に応じて整理し直す関数(並び替えたあとに呼ぶ)
   renderZIndex() {
     this.layers.forEach((layer, i) => {
       layer.canvas.style.zIndex = i + 1;
     });
   }
 
+//layersをmapで以下のオブジェクトの配列に変換（いちいちpushをループしなくてもいい）
   getLayerList() {
     return this.layers.map((layer, index) => ({
       index,
@@ -226,6 +232,25 @@ class LayerManager {
       active: index === this.AI,
     }));
   }
+  renderLayerPanel() {
+  const panel = document.getElementById("layer-panel");
+  panel.innerHTML = ""; // 一旦クリア
+
+  // 最新のレイヤー情報でリストを再構築
+  this.layers.forEach((layer, index) => {
+    const item = document.createElement("div");
+    item.className = "layer-item";
+    item.textContent = layer.name + (index === this.AI ? "（選択中）" : "");
+
+    // レイヤーを選択するクリックイベント
+    item.addEventListener("click", () => {
+      this.setActive(index);
+      this.renderLayerPanel(); // 再描画して選択表示を更新
+    });
+
+    panel.appendChild(item);
+  });
+}
 }
 
 
@@ -239,7 +264,7 @@ function applyBrushStyle(ctx){
 // 🎨 ペンの太さ変更
 brushWidthSlider.addEventListener('input', () => {
   if (!isErasing) {
-    layers[activeIndex].ctx.lineWidth = brushWidthSlider.value;
+    manager.getActiveLayer().ctx.lineWidth = brushWidthSlider.value;
   }
   brushSizeDisplay.textContent = brushWidthSlider.value;
 });
@@ -247,7 +272,7 @@ brushWidthSlider.addEventListener('input', () => {
 // 🧽 消しゴムの太さ変更
 eraserWidthSlider.addEventListener('input', () => {
   if (isErasing) {
-    layers[activeIndex].ctx.lineWidth = eraserWidthSlider.value;
+    manager.getActiveLayer().ctx.lineWidth = eraserWidthSlider.value;
   }
   eraserSizeDisplay.textContent = eraserWidthSlider.value;
 });
@@ -256,10 +281,10 @@ const modeToggle = document.getElementById('mode-toggle');
 modeToggle.addEventListener('click', () => {
   isErasing = !isErasing;  // 状態を反転true or false
   modeToggle.textContent = isErasing ? "ペンに切り替え" : "消しゴムに切り替え";
-  layers[activeIndex].ctx.globalCompositeOperation = isErasing
+  manager.getActiveLayer().ctx.globalCompositeOperation = isErasing
     ? 'destination-out'    // ← 消しゴム（trueのとき）
     : 'source-over';       // ← 通常の描画（falseのとき）
-  layers[activeIndex].ctx.lineWidth = isErasing ? eraserWidthSlider.value : brushWidthSlider.value; //モードごとにブラシサイズを定める
+  manager.getActiveLayer().ctx.lineWidth = isErasing ? eraserWidthSlider.value : brushWidthSlider.value; //モードごとにブラシサイズを定める
 });
   //ボタン
   // ブラシサイズ ±1px
@@ -268,14 +293,14 @@ brushDecreaseBtn.addEventListener('click', () => {
   if (v > parseInt(brushWidthSlider.min, 10)) v--;
   brushWidthSlider.value = v;
   brushSizeDisplay.textContent = v;
-  if (!isErasing) layers[activeIndex].ctx.lineWidth = v;
+  if (!isErasing) manager.getActiveLayer().ctx.lineWidth = v;
 });
 brushIncreaseBtn.addEventListener('click', () => {
   let v = parseInt(brushWidthSlider.value, 10);
   if (v < parseInt(brushWidthSlider.max, 10)) v++;
   brushWidthSlider.value = v;
   brushSizeDisplay.textContent = v;
-  if (!isErasing) layers[activeIndex].ctx.lineWidth = v;
+  if (!isErasing) manager.getActiveLayer().ctx.lineWidth = v;
 });
 
 // 消しゴムサイズ ±1px
@@ -284,14 +309,14 @@ eraserDecreaseBtn.addEventListener('click', () => {
   if (v > parseInt(eraserWidthSlider.min, 10)) v--;
   eraserWidthSlider.value = v;
   eraserSizeDisplay.textContent = v;
-  if (isErasing) layers[activeIndex].ctx.lineWidth = v;
+  if (isErasing) manager.getActiveLayer().ctx.lineWidth = v;
 });
 eraserIncreaseBtn.addEventListener('click', () => {
   let v = parseInt(eraserWidthSlider.value, 10);
   if (v < parseInt(eraserWidthSlider.max, 10)) v++;
   eraserWidthSlider.value = v;
   eraserSizeDisplay.textContent = v;
-  if (isErasing) layers[activeIndex].ctx.lineWidth = v;
+  if (isErasing) manager.getActiveLayer().ctx.lineWidth = v;
 });
 
 // イベントリスナーの処理はlayerごとに呼び出すことが必要
@@ -299,13 +324,14 @@ function setupEvents(layer) {
   const canvas = layer.canvas;
   const ctx    = layer.ctx;
 
-  canvas._onMouseDown = function(e){
+  canvas._onPointerDown = function(e){
     // 押された時に書いてるよとフラグを立てる
     isDrawing = true;
     [lastX, lastY] = [e.offsetX, e.offsetY];
+    canvas.setPointerCapture(e.pointerId); //追加
   };
 
-  canvas._onMouseMove = function(e){
+  canvas._onPointerMove = function(e){
     // マウスが動いてる時常に（フラグが立っている時にisDrawingで限定）
     // カーソルのスクリプト
     // ① まず前回のプレビューを消す
@@ -343,11 +369,12 @@ function setupEvents(layer) {
     [lastX, lastY] = [e.offsetX, e.offsetY];
   };
 
-  // マウスを離すと書いてないよになってmousemoveが無効化される。カーソルも消す
+  // マウスを離すと書いてないよになってpointermoveが無効化される。カーソルも消す
   // アロー関数を使用(簡単な記法)
-  canvas._onMouseUp    = () => isDrawing = false;
-  canvas._onMouseLeave = () => {
+  canvas._onPointerUp    = (e) => isDrawing = false;
+  canvas._onPointerLeave = (e) => {
     isDrawing = false;
+    canvas.releasePointerCapture(e.pointerId); // 安全に解放
     cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
   };
 }
@@ -355,24 +382,24 @@ function setupEvents(layer) {
 // イベントリスナーを登録する関数
 function attachDrawEvents(layer) {
   const canvas = layer.canvas;
-  canvas.addEventListener("mousedown",  canvas._onMouseDown);
-  canvas.addEventListener("mousemove",  canvas._onMouseMove);
-  canvas.addEventListener("mouseup",    canvas._onMouseUp);
-  canvas.addEventListener("mouseleave", canvas._onMouseLeave);
+  canvas.addEventListener("pointerdown",  canvas._onPointerDown);
+  canvas.addEventListener("pointermove",  canvas._onPointerMove);
+  canvas.addEventListener("pointerup",    canvas._onPointerUp);
+  canvas.addEventListener("pointerleave", canvas._onPointerLeave);
 }
 
 // イベントリスナーを削除する関数
 function detachDrawEvents(layer) {
   const canvas = layer.canvas;
-  canvas.removeEventListener("mousedown",  canvas._onMouseDown);
-  canvas.removeEventListener("mousemove",  canvas._onMouseMove);
-  canvas.removeEventListener("mouseup",    canvas._onMouseUp);
-  canvas.removeEventListener("mouseleave", canvas._onMouseLeave);
+  canvas.removeEventListener("pointerdown",  canvas._onPointerDown);
+  canvas.removeEventListener("pointermove",  canvas._onPointerMove);
+  canvas.removeEventListener("pointerup",    canvas._onPointerUp);
+  canvas.removeEventListener("pointerleave", canvas._onPointerLeave);
   // 不要になった参照を削除
-  delete canvas._onMouseDown;
-  delete canvas._onMouseMove;
-  delete canvas._onMouseUp;
-  delete canvas._onMouseLeave;
+  delete canvas._onPointerDown;
+  delete canvas._onPointerMove;
+  delete canvas._onPointerUp;
+  delete canvas._onPointerLeave;
 }
 
   </script>
@@ -383,7 +410,7 @@ const alphaInput = document.getElementById('alpha');
 const alphaDisplay = document.getElementById('alpha-display');
 
 //初期色設定。カラーコードを16進数から10進数に変案、不透明度と合成してrgbaにした後、
-//現在アクティブなレイヤーの線色を変更※レイヤーがないとバグるので注意(エラーメッセージ実装を検討)
+
 function updateBrushColor() {
   const hex = colorInput.value;
   const r = parseInt(hex.slice(1, 3), 16);
@@ -392,8 +419,8 @@ function updateBrushColor() {
   const a = alphaInput.value / 100;
 
   const rgba = `rgba(${r}, ${g}, ${b}, ${a})`;
-  layers[activeIndex].ctx.strokeStyle = rgba;
-  //document.getElementById("color-preview").style.backgroundColor = rgba;
+  //現在アクティブなレイヤーの線色を変更※レイヤーがないとバグるので注意(エラーメッセージ実装を検討)
+  manager.getActiveLayer().ctx.strokeStyle = rgba;
 }
 
 // 色・不透明度の変更イベント
@@ -426,15 +453,12 @@ function resizeCanvases() {
 <!--DOM取得に関わるコード-->
 <script>
   window.addEventListener('load', () => {
-  baseLayer = addLayer(wrapper, layers);
-  applyBrushStyle(baseLayer.ctx);
-  setupEvents(baseLayer);
-  attachDrawEvents(baseLayer);
+  manager = new LayerManager(wrapper);
+  baseLayer = manager.addLayer()
+  manager.renderLayerPanel();
   resizeCanvases();
   updateBrushColor(); // カラーピッカーの初期化
 });
-
-//テスト。反映されてますか？？
 </script>
 </body>
 </html>
