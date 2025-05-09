@@ -1,0 +1,102 @@
+@charset "UTF-8";
+* { /*初期化*/
+	margin: 0px; /* 外余白0px */
+	padding: 0px; /* 内余白0px */
+	border-width: 0px; /* 枠線0px */
+	text-decoration: none; /* 文字装飾なし */
+	font-size: 20px; /* 文字サイズ20px */
+}
+hr {
+	border: none;              /* デフォルトの線をリセット */
+	border-top: 2px dotted #000000; /* 上だけ線を引く（グレー） */
+	margin: 1em 0;             /* 上下に余白 */
+}
+
+canvas {
+    border:  1px solid #000;
+    display: block;
+    margin: 10px auto;         /*中央揃え*/
+}
+#color-block{
+  display: flex;
+  background-color: white;
+}
+#color-picker{
+    width: 50px;   /* 小さく見せたい時 */
+    height: 50px;
+    padding: 0;
+    border: none;
+    cursor: pointer;
+    background-color: white;
+  }
+#title{
+    font:bolder 24px "arial black";
+}
+#eraser-block{
+  display: flex;
+  gap: 30px;
+}
+
+canvas {
+  cursor: none;
+  touch-action: none; /*ペンタブのドラッグをジェスチャーと誤認するのを防ぐのに必要*/
+}
+
+#canvas-wrapper canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+#container {
+  position: relative;
+  width: 600px;
+  height: 400px;
+  margin: 20px auto;
+}
+#canvas-wrapper {
+  position: relative;/*これがレイヤー分けに重要*/
+  width: 100%;
+  height: 100%;
+}
+#canvas-layers canvas {
+  position: absolute;
+  left: 0; top: 0;
+}
+#cursorCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;  /*最前面に表示*/
+  pointer-events: none;
+}
+
+#workspace {
+  display: flex;
+  flex-direction: row; /* ← 横並び */
+  height: 100%;         /* 必要に応じて */
+}
+
+#canvas-container {
+  flex: 1; /* キャンバス側は余白をめいっぱい使う */
+  position: relative;
+}
+
+#layer-panel {
+  width: 200px;
+  background-color: #f0f0f0;
+  border-left: 1px solid #ccc;
+  padding: 10px;
+}
+.layer-item {
+  padding: 5px;
+  cursor: pointer;
+}
+
+.layer-item:hover {
+  background-color: #eee;
+}
