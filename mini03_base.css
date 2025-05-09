@@ -39,6 +39,7 @@ canvas {
 
 canvas {
   cursor: none;
+  touch-action: none; /*ペンタブのドラッグをジェスチャーと誤認するのを防ぐのに必要*/
 }
 
 #canvas-wrapper canvas {
