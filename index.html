@@ -126,7 +126,8 @@ setActive(index) {
     this.AI = index;
 
     updateBrushColor();
-    this.renderLayerPanel();
+    this.updateActiveHighlight();
+    //this.renderLayerPanel();
     //console.log("setActiveが実行されました.");
     console.log("アクティブなレイヤー：layers[",this.AI,"]");
     //console.log("tools is", manager.getActiveLayer().tools);
@@ -235,70 +236,155 @@ removeLayer(index) {
       active: index === this.AI,
     }));
   }
+// --- レイヤーパネル再生成 ---
 renderLayerPanel() {
   const panel = document.getElementById("layer-panel");
   panel.innerHTML = "";
 
-  this.layers.forEach((layer, index) => {
-    const item = document.createElement("div");
-    item.className = "layer-item";
-    if (index === this.AI) item.classList.add("active-layer");
+  // --- ドロップインジケータを初回生成 ---
+  if (!this._dropIndicator) {
+    const di = document.createElement("div");
+    di.className = "drop-indicator";
+    di.style.display = "none";
+    panel.appendChild(di);
+    this._dropIndicator = di;
+  }
+  const dropIndicator = this._dropIndicator;
+  let draggedLayerIndex = null;
 
-    // --- レイヤー名表示 ---
+  // --- 各レイヤー行を生成 ---
+  this.layers.forEach((layer, idx) => {
+    const item = document.createElement("div");
+    // --- 行本体 ---
+    item.className = "layer-item";
+    if (idx === this.AI) item.classList.add("active-layer");
+    item.setAttribute("draggable", true);
+
+    // --- レイヤー名 ---
     const nameSpan = document.createElement("span");
     nameSpan.className = "layer-name";
     nameSpan.textContent = layer.name;
-
-    // --- ダブルクリックでリネーム ---
-    nameSpan.addEventListener("dblclick", (e) => {
+    nameSpan.setAttribute("draggable", false);
+    // ダブルクリックでリネーム
+    nameSpan.addEventListener("dblclick", e => {
       e.stopPropagation();
-
       const input = document.createElement("input");
       input.type = "text";
       input.value = layer.name;
       input.className = "rename-input";
-
-      const finish = (ok = true) => {
-        if (ok) {
-          const newName = input.value.trim() || layer.name;
-          this.renameLayer(index, newName);
-        } else {
-          this.renderLayerPanel(); // キャンセル時は元に戻す
-        }
+      const finish = ok => {
+        if (ok) this.renameLayer(idx, input.value.trim() || layer.name);
+        else    this.renderLayerPanel();
       };
-
-      input.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter") finish(true);
+      input.addEventListener("keydown", ev => {
+        if (ev.key === "Enter")  finish(true);
         if (ev.key === "Escape") finish(false);
       });
       input.addEventListener("blur", () => finish(true));
-
       nameSpan.replaceWith(input);
-      input.focus();
-      input.select();
+      input.focus(); input.select();
     });
 
-    // --- レイヤー選択（再描画なし） ---
+    // --- クリックで選択（ハイライトのみ） ---
     item.addEventListener("click", () => {
-      this.setActive(index);              // AIだけ切り替え
-      this.updateActiveHighlight();       // DOMを差し替えない！
+      this.setActive(idx);
+      this.updateActiveHighlight();
     });
 
     // --- 削除ボタン ---
-    const deleteButton = document.createElement("button");
-    deleteButton.textContent = "✕";
-    deleteButton.className = "delete-button";
-    deleteButton.dataset.index = index;
-
-    deleteButton.addEventListener("click", (e) => {
+    const delBtn = document.createElement("button");
+    delBtn.className = "delete-button";
+    delBtn.textContent = "✕";
+    delBtn.setAttribute("draggable", false);
+    delBtn.addEventListener("click", e => {
       e.stopPropagation();
-      this.removeLayer(index);            // この中でrenderLayerPanel()が呼ばれる
+      this.removeLayer(idx);
     });
 
+    // --- ドラッグ開始／終了 ---
+    item.addEventListener("dragstart", e => {
+      draggedLayerIndex = idx;
+      item.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", "");
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      dropIndicator.style.display = "none";
+    });
+
+    // --- DOMへ配置（逆順表示） ---
     item.appendChild(nameSpan);
-    item.appendChild(deleteButton);
+    item.appendChild(delBtn);
     panel.prepend(item);
   });
+
+  // --- パネル全体で dragover/drop を処理 ---
+  panel.addEventListener("dragover", e => {
+    e.preventDefault();
+    const tgt = e.target.closest(".layer-item");
+    if (!tgt) return;
+    const rect = tgt.getBoundingClientRect();
+    const before = e.clientY < rect.top + rect.height / 2;
+    dropIndicator.style.display = "block";
+    panel.insertBefore(dropIndicator, before ? tgt : tgt.nextSibling);
+  });
+
+panel.addEventListener("drop", e => {
+  e.preventDefault();
+
+  if (draggedLayerIndex == null) return;
+
+  // --- 1. インジケータの位置から表示上の行番号を取得 ---
+  const visiblerows = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
+  const visualDropIndex = visiblerows.indexOf(dropIndicator);
+
+  // --- 2. 表示順 → 論理順に変換（prepend表示なので逆順） ---
+  let targetLayerIndex = this.layers.length - 1 - visualDropIndex;
+
+  // --- 3. 範囲を強制的に補正（0 ～ layers.length-1） ---
+  targetLayerIndex = Math.min(Math.max(targetLayerIndex, 0), this.layers.length - 1);
+
+  // --- 4. 同じ場所なら何もしない ---
+  if (targetLayerIndex === draggedLayerIndex) {
+    draggedLayerIndex = null;
+    dropIndicator.style.display = "none";
+    return;
+  }
+
+  // --- 5. 実際に配列を並び替え ---
+const movedLayer = this.layers.splice(draggedLayerIndex, 1)[0];
+
+/* ↓↓↓ ここがポイント ↓↓↓ */
+let insertionIndex = targetLayerIndex;
+if (insertionIndex > draggedLayerIndex) {
+  // 下方向へ移動する場合は 1 つ手前にずらす
+  insertionIndex -= 1;
+}
+
+this.layers.splice(insertionIndex, 0, movedLayer);
+
+
+  // --- 6. アクティブインデックス（AI）補正 ---
+  if (this.AI === draggedLayerIndex) {
+    this.AI = targetLayerIndex;
+  } else if (draggedLayerIndex < this.AI && targetLayerIndex >= this.AI) {
+    this.AI -= 1;
+  } else if (draggedLayerIndex > this.AI && targetLayerIndex <= this.AI) {
+    this.AI += 1;
+  }
+
+  // --- 7. Z-indexを更新して表示順を正す ---
+  this.renderZIndex();
+
+  // --- 8. パネルを再描画 ---
+  this.renderLayerPanel();
+
+  // --- 9. 後始末 ---
+  draggedLayerIndex = null;
+  dropIndicator.style.display = "none";
+});
+
 }
 
 
