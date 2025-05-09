@@ -52,7 +52,7 @@
 //Javascriptはbodyの最下部に書く。これはキャンバスとレイヤーのスクリプト
 const wrapper = document.getElementById("canvas-wrapper");
 const cursorCanvas = document.getElementById("cursorCanvas");
-const cursorCtx = cursorCanvas.getContext("2d");
+const cursorTools = cursorCanvas.getContext("2d");
   //ブラシサイズを取得
   const brushWidthSlider = document.getElementById('brush-width');
   const eraserWidthSlider = document.getElementById('eraser-width');
@@ -78,7 +78,7 @@ class Layer {
   constructor(name) {
     this.name = name;
     this.canvas = document.createElement("canvas");
-    this.ctx = this.canvas.getContext("2d");
+    this.tools = this.canvas.getContext("2d");
     this.visible = true;
   }
 }
@@ -102,7 +102,7 @@ class LayerManager {
     layer.canvas.style.left = "0";
     this.wrapper.appendChild(layer.canvas);
 
-    applyBrushStyle(layer.ctx);
+    applyBrushStyle(layer.tools);
 
     this.layers.push(layer);
     this.AI = this.layers.length - 1;  //レイヤー1のAIは0,追加したらそれがアクティブになる
@@ -123,7 +123,7 @@ setActive(index) {
     this.renderLayerPanel();
     //console.log("setActiveが実行されました.");
     console.log("アクティブなレイヤー：layers[",this.AI,"]");
-    //console.log("ctx is", manager.getActiveLayer().ctx);
+    //console.log("tools is", manager.getActiveLayer().tools);
     //console.log("canvas is", manager.getActiveLayer().canvas);
     console.log(this.layers);
   } else {
@@ -178,7 +178,7 @@ setActive(index) {
     const newLayer = new Layer(`${original.name} copy`);
     newLayer.canvas.width = original.canvas.width;
     newLayer.canvas.height = original.canvas.height;
-    newLayer.ctx.drawImage(original.canvas, 0, 0);
+    newLayer.tools.drawImage(original.canvas, 0, 0);
 
     newLayer.canvas.style.zIndex = this.layers.length + 1;
     newLayer.canvas.style.position = "absolute";
@@ -186,7 +186,7 @@ setActive(index) {
     newLayer.canvas.style.left = "0";
     this.wrapper.appendChild(newLayer.canvas);
 
-    applyBrushStyle(newLayer.ctx);
+    applyBrushStyle(newLayer.tools);
 
 
     this.layers.push(newLayer);
@@ -245,7 +245,7 @@ class DrawManager {
   constructor(wrapper, cursorCanvas, layerManager) {
     this.wrapper       = wrapper;
     this.cursorCanvas  = cursorCanvas;
-    this.cursorCtx     = cursorCanvas.getContext('2d');
+    this.cursorTools     = cursorCanvas.getContext('2d');
     this.layerManager  = layerManager;
 
     this.isDrawing = false;
@@ -285,15 +285,15 @@ class DrawManager {
     if (!this.isDrawing || e.buttons !== 1) return;
     const {x, y} = this.toCanvas(e);
 
-    const ctx  = this.layerManager.getActiveLayer().ctx;
+    const tools  = this.layerManager.getActiveLayer().tools;
     const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
 
-    ctx.lineWidth = size;
-    ctx.lineCap = ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(this.lastX, this.lastY);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    tools.lineWidth = size;
+    tools.lineCap = tools.lineJoin = 'round';
+    tools.beginPath();
+    tools.moveTo(this.lastX, this.lastY);
+    tools.lineTo(x, y);
+    tools.stroke();
 
     this.lastX = x; this.lastY = y;
   }
@@ -301,21 +301,21 @@ class DrawManager {
   //pointerup, pointerleave
   onUp(e) {
     this.isDrawing = false;
-    this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
+    this.cursorTools.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
   }
 
   // クリック点を丸で埋める関数（ペン／消しゴム共用）
   drawDot(x, y) {
-    const ctx  = this.layerManager.getActiveLayer().ctx;
+    const tools  = this.layerManager.getActiveLayer().tools;
     const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
 
-    ctx.save();
-    ctx.lineWidth = 0;
-    ctx.fillStyle = ctx.strokeStyle;
-    ctx.beginPath();
-    ctx.arc(x, y, size/2, 0, Math.PI*2);
-    ctx.fill();
-    ctx.restore();
+    tools.save();
+    tools.lineWidth = 0;
+    tools.fillStyle = tools.strokeStyle;
+    tools.beginPath();
+    tools.arc(x, y, size/2, 0, Math.PI*2);
+    tools.fill();
+    tools.restore();
   }
 
   //カーソルプレビュー
@@ -323,26 +323,26 @@ class DrawManager {
     const {x, y} = this.toCanvas(e);
     const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
 
-    this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
-    this.cursorCtx.lineWidth = 1;
-    this.cursorCtx.strokeStyle = 'rgba(0,0,0,0.6)';
-    this.cursorCtx.beginPath();
-    this.cursorCtx.arc(x, y, size/2, 0, Math.PI*2);
-    this.cursorCtx.stroke();
+    this.cursorTools.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
+    this.cursorTools.lineWidth = 1;
+    this.cursorTools.strokeStyle = 'rgba(0,0,0,0.6)';
+    this.cursorTools.beginPath();
+    this.cursorTools.arc(x, y, size/2, 0, Math.PI*2);
+    this.cursorTools.stroke();
   }
 }
 
 
 
-function applyBrushStyle(ctx){
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
+function applyBrushStyle(tools){
+  tools.lineCap = "round";
+  tools.lineJoin = "round";
 }
 
 // 🎨 ペンの太さ変更
 brushWidthSlider.addEventListener('input', () => {
   if (!isErasing) {
-    manager.getActiveLayer().ctx.lineWidth = brushWidthSlider.value;
+    manager.getActiveLayer().tools.lineWidth = brushWidthSlider.value;
   }
   brushSizeDisplay.textContent = brushWidthSlider.value;
 });
@@ -350,7 +350,7 @@ brushWidthSlider.addEventListener('input', () => {
 // 🧽 消しゴムの太さ変更
 eraserWidthSlider.addEventListener('input', () => {
   if (isErasing) {
-    manager.getActiveLayer().ctx.lineWidth = eraserWidthSlider.value;
+    manager.getActiveLayer().tools.lineWidth = eraserWidthSlider.value;
   }
   eraserSizeDisplay.textContent = eraserWidthSlider.value;
 });
@@ -359,10 +359,10 @@ const modeToggle = document.getElementById('mode-toggle');
 modeToggle.addEventListener('click', () => {
   isErasing = !isErasing;  // 状態を反転true or false
   modeToggle.textContent = isErasing ? "ペンに切り替え" : "消しゴムに切り替え";
-  manager.getActiveLayer().ctx.globalCompositeOperation = isErasing
+  manager.getActiveLayer().tools.globalCompositeOperation = isErasing
     ? 'destination-out'    // ← 消しゴム（trueのとき）
     : 'source-over';       // ← 通常の描画（falseのとき）
-  manager.getActiveLayer().ctx.lineWidth = isErasing ? eraserWidthSlider.value : brushWidthSlider.value; //モードごとにブラシサイズを定める
+  manager.getActiveLayer().tools.lineWidth = isErasing ? eraserWidthSlider.value : brushWidthSlider.value; //モードごとにブラシサイズを定める
 });
   //ボタン
   // ブラシサイズ ±1px
@@ -371,14 +371,14 @@ brushDecreaseBtn.addEventListener('click', () => {
   if (v > parseInt(brushWidthSlider.min, 10)) v--;
   brushWidthSlider.value = v;
   brushSizeDisplay.textContent = v;
-  if (!isErasing) manager.getActiveLayer().ctx.lineWidth = v;
+  if (!isErasing) manager.getActiveLayer().tools.lineWidth = v;
 });
 brushIncreaseBtn.addEventListener('click', () => {
   let v = parseInt(brushWidthSlider.value, 10);
   if (v < parseInt(brushWidthSlider.max, 10)) v++;
   brushWidthSlider.value = v;
   brushSizeDisplay.textContent = v;
-  if (!isErasing) manager.getActiveLayer().ctx.lineWidth = v;
+  if (!isErasing) manager.getActiveLayer().tools.lineWidth = v;
 });
 
 // 消しゴムサイズ ±1px
@@ -387,14 +387,14 @@ eraserDecreaseBtn.addEventListener('click', () => {
   if (v > parseInt(eraserWidthSlider.min, 10)) v--;
   eraserWidthSlider.value = v;
   eraserSizeDisplay.textContent = v;
-  if (isErasing) manager.getActiveLayer().ctx.lineWidth = v;
+  if (isErasing) manager.getActiveLayer().tools.lineWidth = v;
 });
 eraserIncreaseBtn.addEventListener('click', () => {
   let v = parseInt(eraserWidthSlider.value, 10);
   if (v < parseInt(eraserWidthSlider.max, 10)) v++;
   eraserWidthSlider.value = v;
   eraserSizeDisplay.textContent = v;
-  if (isErasing) manager.getActiveLayer().ctx.lineWidth = v;
+  if (isErasing) manager.getActiveLayer().tools.lineWidth = v;
 });
 
 
@@ -416,7 +416,7 @@ function updateBrushColor() {
 
   const rgba = `rgba(${r}, ${g}, ${b}, ${a})`;
   //現在アクティブなレイヤーの線色を変更※レイヤーがないとバグるので注意(エラーメッセージ実装を検討)
-  manager.getActiveLayer().ctx.strokeStyle = rgba;
+  manager.getActiveLayer().tools.strokeStyle = rgba;
   //console.log("color changed!");
 }
 
