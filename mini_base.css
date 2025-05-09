@@ -93,10 +93,66 @@ canvas {
   padding: 10px;
 }
 .layer-item {
+    justify-content: space-between; /* ← 両端に配置 */
+  align-items: center;            /* 縦方向中央揃え */
+  display: flex;
   padding: 5px;
   cursor: pointer;
+  border:1px solid #000;
 }
 
 .layer-item:hover {
-  background-color: #eee;
+  display: flex;
+  background-color: #919191;
+  color: white;
+
+}
+
+.layer-item.active-layer {
+  display: flex;
+  background-color: #0159dd;
+  color: white;
+  font-weight: bold;
+}
+
+#layer-container{
+  background-color: #f0f0f0;
+  border:2px solid #000;
+}
+#add-layer,#add-layer-from-tags{
+  width: 100%;
+  background-color: #f0f0f0;
+  padding: 2px;
+  cursor: pointer;
+  border:1px solid #919191;
+}
+#add-layer:hover,#add-layer-from-tags:hover{
+  background-color: #919191;
+  color: white;
+}
+
+.delete-button{
+  font-size: 15px;
+  background-color: rgb(180, 0, 0);
+  color: white;
+
+  width: 24px;        /* 正方形になるよう指定 */
+  height: 24px;
+  line-height: 24px;  /* テキスト縦中央用 */
+  text-align: center; /* テキスト横中央用 */
+  margin-left: auto;  /* 右寄せしたい場合 */
+  cursor: pointer;    /* ホバー時にポインタ表示 */
+  border-radius: 4px; /* 角丸にするなら */
+}
+.delete-button:hover{
+  font-size: 20px;
+  background-color: rgb(255, 0, 0);
+  color: white;
+    width: 28px;        /* 正方形になるよう指定 */
+  height: 28px;
+  line-height: 28px;  /* テキスト縦中央用 */
+  text-align: center; /* テキスト横中央用 */
+  margin-left: auto;  /* 右寄せしたい場合 */
+  cursor: pointer;    /* ホバー時にポインタ表示 */
+  border-radius: 4px; /* 角丸にするなら */
 }
