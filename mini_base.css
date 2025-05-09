@@ -84,14 +84,20 @@ canvas {
 #canvas-container {
   flex: 1; /* キャンバス側は余白をめいっぱい使う */
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
 #layer-panel {
-  width: 200px;
+  width: auto;
+  max-height: 300px;
   background-color: #f0f0f0;
   border-left: 1px solid #ccc;
   padding: 10px;
   cursor: pointer;
+    flex: 1;               /* 上のボタン群を残して、残りスペースを占有 */
+  overflow-y: auto;      /* 縦スクロールを有効に */
+  scrollbar-gutter: stable;
 }
 .layer-item {
     justify-content: space-between; /* ← 両端に配置 */
@@ -106,6 +112,7 @@ canvas {
   display: flex;
   background-color: #919191;
   color: white;
+  user-select: none;
 
 }
 
@@ -196,4 +203,20 @@ canvas {
   font-size: 20px;
   padding: 2px;
   background-color: #fff;
+}
+
+.layer-item.dragging {
+  opacity: 0.5;
+}
+.layer-item.drag-over {
+  outline: 2px dashed #888;
+}
+.layer-item        { user-select: none; }
+.drop-indicator {
+  height: 32px;                      /* レイヤー行と同じくらいの高さ */
+  background-color: rgba(56, 168, 255, 0.2);  /* 薄い青枠 */
+  border: 5px dashed #0159dd;          /* 点線で目立たせる */
+  /*box-sizing: border-box;*/
+  margin: 0px;
+  transition: background 0.2s ease;
 }
