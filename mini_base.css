@@ -212,11 +212,8 @@ canvas {
   outline: 2px dashed #888;
 }
 .layer-item        { user-select: none; }
-.drop-indicator {
-  height: 32px;                      /* レイヤー行と同じくらいの高さ */
-  background-color: rgba(56, 168, 255, 0.2);  /* 薄い青枠 */
-  border: 5px dashed #0159dd;          /* 点線で目立たせる */
-  /*box-sizing: border-box;*/
-  margin: 0px;
-  transition: background 0.2s ease;
+
+.drop-indicator    {
+  height: 0; border-top: 5px solid rgb(255, 0, 140);  /* 好きな色に */
+  margin: 0 4px;
 }
