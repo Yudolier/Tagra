@@ -63,9 +63,10 @@ const cursorCtx = cursorCanvas.getContext("2d");
   const brushIncreaseBtn  = document.getElementById('brush-increase');
   const eraserDecreaseBtn = document.getElementById('eraser-decrease');
   const eraserIncreaseBtn = document.getElementById('eraser-increase');
-  //レイヤーに関連する変数
-  let layers = [];  //レイヤーというオブジェクトを格納する配列
-  let activeIndex = 0;  //何番目を描画中？
+  //レイヤーに関連する変数(旧)
+  //let layers = [];  //レイヤーというオブジェクトを格納する配列
+  //let activeIndex = 0;  //何番目を描画中？
+
   //描画フラグと座標の初期化
     let isDrawing = false;
     let isErasing = false;
@@ -83,7 +84,7 @@ class Layer {
     this.visible = true;
   }
 }
-function addLayer(wrapper, layers) {
+/*function addLayer(wrapper, layers) {
   const index = layers.length + 1;  // ← 今から追加されるレイヤー番号 0番目が1
   const layer = new Layer(`Layer ${index}`);  //スコープok!
   layer.canvas.style.zIndex = index;
@@ -95,6 +96,7 @@ function addLayer(wrapper, layers) {
   layers.push(layer);
   return layer;
 }
+*/
 class LayerManager {
   constructor(wrapper) {
     this.wrapper = wrapper;
@@ -120,7 +122,7 @@ class LayerManager {
     attachDrawEvents(layer);
 
     this.layers.push(layer);
-    this.AI = this.layers.length - 1;  //レイヤー1のAIは0
+    this.AI = this.layers.length - 1;  //レイヤー1のAIは0,追加したらそれがアクティブになる
     this.renderLayerPanel();
     return layer;
   }
@@ -252,7 +254,7 @@ setActive(index) {
 
     // レイヤーを選択するクリックイベント
     item.addEventListener("click", () => {
-      this.setActive(index);
+      this.setActive(index);  //も呼ばれるようにしてクリックと結びつける
       this.renderLayerPanel(); // 再描画して選択表示を更新
     });
 
@@ -343,7 +345,6 @@ function setupEvents(layer) {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top ) * scaleY;
     [lastX, lastY] = [x, y];
-
     // クリック時点で1ドット描画
   const ctx = layer.ctx;
   const size = isErasing
@@ -371,6 +372,7 @@ function setupEvents(layer) {
   const pressure = e.pressure ?? 0.5; // pressureは0〜1（なければ0.5くらいに）
   console.log("筆圧:", pressure);
   // ① キャンバスの表示上の位置とサイズを取得
+  const ctx = layer.ctx;  //別のスコープを持つので取りに行く
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width  / rect.width;
   const scaleY = canvas.height / rect.height;
