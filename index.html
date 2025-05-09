@@ -14,14 +14,14 @@
   <p id="title">TaGra-mini</p>
   <!--キャンバス-->
 <div id="workspace">
-    <div id="container">
-  <div id="canvas-wrapper">
-    <!-- drawCanvas はlayer[aI].canvasに。動的に追加する-->
+  <div id="container">
+    <div id="canvas-wrapper">
+      <!-- drawCanvas はlayer[aI].canvasに。動的に追加する-->
+    </div>
+    <!-- cursorCanvasを最前面で独立させる-->
+    <canvas id="cursorCanvas">カーソルキャンバス</canvas>
   </div>
-  <!-- cursorCanvasを最前面で独立させる-->
-  <canvas id="cursorCanvas">カーソルキャンバス</canvas>
-</div>
-<div id="layer-panel"></div>
+  <div id="layer-panel"></div>
 </div>
   <hr>
   <!-- 線の太さ調整スライダー/inputとはユーザーからの入力を受け付けるもの -->
@@ -248,7 +248,7 @@ class LayerManager {
       this.renderLayerPanel(); // 再描画して選択表示を更新
     });
 
-    panel.appendChild(item);
+    panel.prepend(item);
   });
 }
 }
@@ -334,7 +334,7 @@ function setupEvents(layer) {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top ) * scaleY;
     [lastX, lastY] = [x, y];
-    //canvas.setPointerCapture(e.pointerId);
+    canvas.setPointerCapture(e.pointerId);
   };
 
   canvas._onPointerMove = function(e) {
@@ -384,12 +384,12 @@ function setupEvents(layer) {
   canvas._onPointerUp    = (e) => {
     console.log("↑ pointerup", e);
     isDrawing = false;
-    //canvas.releasePointerCapture(e.pointerId);
+    canvas.releasePointerCapture(e.pointerId);
   }
   canvas._onPointerLeave = (e) => {
     console.log("pointerleave", e);
-    //isDrawing = false;
-    //canvas.releasePointerCapture(e.pointerId);
+    isDrawing = false;
+    canvas.releasePointerCapture(e.pointerId);
     cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
   };
 }
@@ -436,6 +436,7 @@ function updateBrushColor() {
   const rgba = `rgba(${r}, ${g}, ${b}, ${a})`;
   //現在アクティブなレイヤーの線色を変更※レイヤーがないとバグるので注意(エラーメッセージ実装を検討)
   manager.getActiveLayer().ctx.strokeStyle = rgba;
+  console.log("color changed!");
 }
 
 // 色・不透明度の変更イベント
