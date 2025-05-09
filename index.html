@@ -325,56 +325,71 @@ function setupEvents(layer) {
   const ctx    = layer.ctx;
 
   canvas._onPointerDown = function(e){
+    console.log("↓ pointerdown", e);
     // 押された時に書いてるよとフラグを立てる
     isDrawing = true;
-    [lastX, lastY] = [e.offsetX, e.offsetY];
-    canvas.setPointerCapture(e.pointerId); //追加
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top ) * scaleY;
+    [lastX, lastY] = [x, y];
+    //canvas.setPointerCapture(e.pointerId);
   };
 
-  canvas._onPointerMove = function(e){
-    // マウスが動いてる時常に（フラグが立っている時にisDrawingで限定）
-    // カーソルのスクリプト
-    // ① まず前回のプレビューを消す
-    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-    // ② 現在のモードとサイズを取得
-    const size = isErasing
-      ? parseInt(eraserWidthSlider.value, 10)
-      : parseInt(brushWidthSlider.value, 10);
-    const x = e.offsetX, y = e.offsetY;
-    // ③ プレビューのスタイルを設定
-    cursorCtx.lineWidth = 1;
-    if (isErasing) {
-      // 消しゴムモード：半透明グレーで枠だけ
-      cursorCtx.strokeStyle = "rgba(0,0,0,0.3)";
-    } else {
-      // ペンモード：今の線色（不透明度込み）を使う
-      cursorCtx.strokeStyle = ctx.strokeStyle;
-    }
-    // ④ 円を描く
-    cursorCtx.beginPath();
-    cursorCtx.arc(x, y, size / 2, 0, Math.PI * 2);
-    cursorCtx.stroke();
+  canvas._onPointerMove = function(e) {
+  const pressure = e.pressure ?? 0.5; // pressureは0〜1（なければ0.5くらいに）
+  console.log("筆圧:", pressure);
+  // ① キャンバスの表示上の位置とサイズを取得
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
 
-    // 実際の描画のスクリプト
-    // フラグが立っているので描画がなされる
-    if (!isDrawing) return;
-    ctx.lineWidth   = size;
-    // ブラシ形状の再確認
-    ctx.lineCap     = "round";
-    ctx.lineJoin    = "round";
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(e.offsetX, e.offsetY);
-    ctx.stroke();
-    [lastX, lastY] = [e.offsetX, e.offsetY];
-  };
+  // ② イベントの位置（画面上）→ キャンバス内部座標に変換
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top ) * scaleY;
+
+  // ③ カーソルプレビューの描画
+  cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
+  const size = isErasing
+    ? parseInt(eraserWidthSlider.value, 10)
+    : parseInt(brushWidthSlider.value, 10);
+
+  cursorCtx.lineWidth = 1;
+  cursorCtx.strokeStyle = isErasing ? "rgba(0,0,0,0.3)" : ctx.strokeStyle;
+
+  cursorCtx.beginPath();
+  cursorCtx.arc(x, y, size / 2, 0, Math.PI * 2);
+  cursorCtx.stroke();
+
+  // ④ 実際の描画処理
+  if (!isDrawing || e.buttons !== 1) return;
+
+  ctx.lineWidth = size;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.stroke();
+
+  [lastX, lastY] = [x, y];
+
+};
+
 
   // マウスを離すと書いてないよになってpointermoveが無効化される。カーソルも消す
   // アロー関数を使用(簡単な記法)
-  canvas._onPointerUp    = (e) => isDrawing = false;
-  canvas._onPointerLeave = (e) => {
+  canvas._onPointerUp    = (e) => {
+    console.log("↑ pointerup", e);
     isDrawing = false;
-    canvas.releasePointerCapture(e.pointerId); // 安全に解放
+    //canvas.releasePointerCapture(e.pointerId);
+  }
+  canvas._onPointerLeave = (e) => {
+    console.log("pointerleave", e);
+    //isDrawing = false;
+    //canvas.releasePointerCapture(e.pointerId);
     cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
   };
 }
