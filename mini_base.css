@@ -190,3 +190,10 @@ canvas {
   font-weight: bold;
   outline:2px solid #000;
 }
+
+.rename-input{
+  width: 80%;
+  font-size: 20px;
+  padding: 2px;
+  background-color: #fff;
+}
