@@ -118,8 +118,6 @@ class LayerManager {
     this.wrapper.appendChild(layer.canvas);
 
     applyBrushStyle(layer.ctx);
-    setupEvents(layer);
-    attachDrawEvents(layer);
 
     this.layers.push(layer);
     this.AI = this.layers.length - 1;  //レイヤー1のAIは0,追加したらそれがアクティブになる
@@ -135,11 +133,8 @@ setActive(index) {
   if (index >= 0 && index < this.layers.length) {
     const previousLayer = this.getActiveLayer();  // ←今のアクティブレイヤーを保持
     this.AI = index;
-    detachDrawEvents(previousLayer);          // ←今のを外す
-    console.log(previousLayer.name,"からはずしました");
-    attachDrawEvents(this.getActiveLayer());      // ←新しいのを付ける
-    console.log(this.getActiveLayer().name,"につけなおしました");
-    updateBrushColor();                           // ←色の再適用もお忘れなく！
+
+    updateBrushColor();
     this.renderLayerPanel();
     console.log("setActiveが実行されました.");
     console.log("アクティブなレイヤー：layers[",this.AI,"]");
@@ -161,7 +156,7 @@ setActive(index) {
     const layer = this.layers[index];
     if (!layer) return false;
 
-    detachDrawEvents(layer);  //バグらせないために必要な処理
+
     this.wrapper.removeChild(layer.canvas);
     this.layers.splice(index, 1);
 
@@ -208,8 +203,7 @@ setActive(index) {
     this.wrapper.appendChild(newLayer.canvas);
 
     applyBrushStyle(newLayer.ctx);
-    setupEvents(newLayer);
-    attachDrawEvents(newLayer);
+
 
     this.layers.push(newLayer);
     this.AI = this.layers.length - 1;
@@ -262,7 +256,96 @@ setActive(index) {
   });
 }
 }
+class DrawManager {
+  constructor(wrapper, cursorCanvas, layerManager) {
+    this.wrapper       = wrapper;
+    this.cursorCanvas  = cursorCanvas;
+    this.cursorCtx     = cursorCanvas.getContext('2d');
+    this.layerManager  = layerManager;
 
+    this.isDrawing = false;
+    this.lastX = this.lastY = 0;
+
+    // イベント登録はコンストラクタで１回だけ
+    wrapper.addEventListener('pointerdown',  e => this.onDown(e));
+    wrapper.addEventListener('pointermove',  e => this.onMove(e));
+    wrapper.addEventListener('pointerup',    e => this.onUp(e));
+    wrapper.addEventListener('pointerleave', e => this.onUp(e));
+  }
+
+  /* 座標を wrapper → アクティブキャンバス座標へ変換 */
+  toCanvas(e) {
+    const rect = this.wrapper.getBoundingClientRect();
+    const scaleX = this.wrapper.clientWidth  ? (this.wrapper.querySelector('canvas').width  / rect.width)  : 1;
+    const scaleY = this.wrapper.clientHeight ? (this.wrapper.querySelector('canvas').height / rect.height) : 1;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top)  * scaleY,
+    };
+  }
+
+  /* pointerdown */
+  onDown(e) {
+    this.isDrawing = true;
+    const {x, y} = this.toCanvas(e);
+    this.lastX = x; this.lastY = y;
+    this.drawDot(x, y);              // クリック点を 1 ドット描く
+  }
+
+  /* pointermove */
+  onMove(e) {
+    // カーソルプレビュー（省略可）
+    this.updateCursorPreview(e);
+
+    if (!this.isDrawing || e.buttons !== 1) return;
+    const {x, y} = this.toCanvas(e);
+
+    const ctx  = this.layerManager.getActiveLayer().ctx;
+    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
+
+    ctx.lineWidth = size;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(this.lastX, this.lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+
+    this.lastX = x; this.lastY = y;
+  }
+
+  /* pointerup / pointerleave */
+  onUp(e) {
+    this.isDrawing = false;
+    this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
+  }
+
+  /* クリック点を丸で埋める（ペン／消しゴム共用） */
+  drawDot(x, y) {
+    const ctx  = this.layerManager.getActiveLayer().ctx;
+    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
+
+    ctx.save();
+    ctx.lineWidth = 0;
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.arc(x, y, size/2, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  /* カーソルプレビュー */
+  updateCursorPreview(e) {
+    const {x, y} = this.toCanvas(e);
+    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
+
+    this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
+    this.cursorCtx.lineWidth = 1;
+    this.cursorCtx.strokeStyle = isErasing ? 'rgba(0,0,0,0.3)' : this.layerManager.getActiveLayer().ctx.strokeStyle;
+    this.cursorCtx.beginPath();
+    this.cursorCtx.arc(x, y, size/2, 0, Math.PI*2);
+    this.cursorCtx.stroke();
+  }
+}
 
 
 
@@ -329,7 +412,7 @@ eraserIncreaseBtn.addEventListener('click', () => {
   if (isErasing) manager.getActiveLayer().ctx.lineWidth = v;
 });
 
-// イベントリスナーの処理はlayerごとに呼び出すことが必要
+
 function setupEvents(layer) {
   console.log("setupEvents called for:", layer.name);
   const canvas = layer.canvas;
@@ -442,13 +525,13 @@ function detachDrawEvents(layer) {
   canvas.removeEventListener("pointermove",  canvas._onPointerMove);
   canvas.removeEventListener("pointerup",    canvas._onPointerUp);
   canvas.removeEventListener("pointerleave", canvas._onPointerLeave);
-  
+
   //delete canvas._onPointerDown;
   //delete canvas._onPointerMove;
   //delete canvas._onPointerUp;
   //delete canvas._onPointerLeave;
 }
-
+*/
   </script>
 
   <script>// カラーピッカーのスクリプト。
@@ -507,6 +590,7 @@ function resizeCanvases() {
   resizeCanvases();
   updateBrushColor(); // カラーピッカーの初期化
   manager.addLayer();//for debug
+  DM = new DrawManager(wrapper, cursorCanvas, manager);
 });
 </script>
 </body>
