@@ -257,6 +257,8 @@ renderLayerPanel() {
     const item = document.createElement("div");
     // --- 行本体 ---
     item.className = "layer-item";
+    item.dataset.index = idx;
+
     if (idx === this.AI) item.classList.add("active-layer");
     item.setAttribute("draggable", true);
 
