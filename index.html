@@ -5,10 +5,6 @@
   <title>TaGra-mini</title>
   <link rel="stylesheet" href="mini03_base.css">
   <link rel="stylesheet" href="mini03_layers.css">
-  <!-- PickrのテーマCSS -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/classic.min.css"/>
-  <!-- PickrのJS -->
-  <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr"></script>
 </head>
 <body>
   <p id="title">TaGra-mini</p>
@@ -105,10 +101,10 @@ class LayerManager {
     this.cursorCanvas = document.getElementById("cursorCanvas");
     this.layers = [];
     this.AI = 0;
-    this.nextId = 1; // 名前が被らないようにする
+    this.nextId = 1;
   }
 
-  addLayer(name = `Layer ${this.nextId++}`) {
+  addLayer(name = `Layer ${this.nextId++}`) { //使ってから1増やす
     const layer = new Layer(name);
     const { clientWidth: w, clientHeight: h } = this.wrapper;
     layer.canvas.width = w;
@@ -133,14 +129,26 @@ class LayerManager {
     return this.layers[this.AI] ?? null;
   }
 
-  setActive(index) {
-    if (index >= 0 && index < this.layers.length) {
-      this.AI = index;
-      this.renderLayerPanel();
-    }else{
-      alert("エラー：無効な値です。");
-    }
+setActive(index) {
+  if (index >= 0 && index < this.layers.length) {
+    const previousLayer = this.getActiveLayer();  // ←今のアクティブレイヤーを保持
+    this.AI = index;
+    detachDrawEvents(previousLayer);          // ←今のを外す
+    console.log(previousLayer.name,"からはずしました");
+    attachDrawEvents(this.getActiveLayer());      // ←新しいのを付ける
+    console.log(this.getActiveLayer().name,"につけなおしました");
+    updateBrushColor();                           // ←色の再適用もお忘れなく！
+    this.renderLayerPanel();
+    console.log("setActiveが実行されました.");
+    console.log("アクティブなレイヤー：layers[",this.AI,"]");
+    console.log("ctx is", manager.getActiveLayer().ctx);
+    console.log("canvas is", manager.getActiveLayer().canvas);
+
+    console.log(this.layers);
+  } else {
+    alert("エラー：無効な値です。");
   }
+}
 
   removeLayer(index) {
     if (this.layers.length <= 1) {
@@ -321,6 +329,7 @@ eraserIncreaseBtn.addEventListener('click', () => {
 
 // イベントリスナーの処理はlayerごとに呼び出すことが必要
 function setupEvents(layer) {
+  console.log("setupEvents called for:", layer.name);
   const canvas = layer.canvas;
   const ctx    = layer.ctx;
 
@@ -334,6 +343,27 @@ function setupEvents(layer) {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top ) * scaleY;
     [lastX, lastY] = [x, y];
+
+    // クリック時点で1ドット描画
+  const ctx = layer.ctx;
+  const size = isErasing
+    ? parseInt(eraserWidthSlider.value, 10)
+    : parseInt(brushWidthSlider.value, 10);
+
+  ctx.lineWidth = size;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.beginPath();
+  ctx.arc(x, y, size / 2, 0, Math.PI * 2);
+  ctx.fillStyle = ctx.strokeStyle;
+  if (isErasing) {
+    ctx.globalCompositeOperation = 'destination-out';
+  } else {
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  ctx.fill();
+
     canvas.setPointerCapture(e.pointerId);
   };
 
@@ -410,11 +440,11 @@ function detachDrawEvents(layer) {
   canvas.removeEventListener("pointermove",  canvas._onPointerMove);
   canvas.removeEventListener("pointerup",    canvas._onPointerUp);
   canvas.removeEventListener("pointerleave", canvas._onPointerLeave);
-  // 不要になった参照を削除
-  delete canvas._onPointerDown;
-  delete canvas._onPointerMove;
-  delete canvas._onPointerUp;
-  delete canvas._onPointerLeave;
+  
+  //delete canvas._onPointerDown;
+  //delete canvas._onPointerMove;
+  //delete canvas._onPointerUp;
+  //delete canvas._onPointerLeave;
 }
 
   </script>
@@ -474,6 +504,7 @@ function resizeCanvases() {
   manager.renderLayerPanel();
   resizeCanvases();
   updateBrushColor(); // カラーピッカーの初期化
+  manager.addLayer();//for debug
 });
 </script>
 </body>
