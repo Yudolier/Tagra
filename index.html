@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>TaGra-mini</title>
   <link rel="stylesheet" href="mini_base.css">
-  <link rel="stylesheet" href="mini_layers.css">
 </head>
 <body>
   <p id="title">TaGra-mini</p>
@@ -17,7 +16,12 @@
     <!-- cursorCanvasを最前面で独立させる-->
     <canvas id="cursorCanvas">カーソルキャンバス</canvas>
   </div>
-  <div id="layer-panel"></div>
+  <div id="layer-container">
+    <button id="add-layer">新規レイヤー</button>
+    <button id="add-layer-from-tags">新規レイヤー<br>（タグから）</button>
+    <div id="layer-panel"></div>
+  </div>
+
 </div>
   <hr>
   <!-- 線の太さ調整スライダー/inputとはユーザーからの入力を受け付けるもの -->
@@ -63,6 +67,8 @@ const cursorTools = cursorCanvas.getContext("2d");
   const brushIncreaseBtn  = document.getElementById('brush-increase');
   const eraserDecreaseBtn = document.getElementById('eraser-decrease');
   const eraserIncreaseBtn = document.getElementById('eraser-increase');
+  const addLayerBtn = document.getElementById("add-layer");
+  const addLayerFTBtn = document.getElementById("add-layer-from-tags");
   //レイヤーに関連する変数(旧)
   //let layers = [];  //レイヤーというオブジェクトを格納する配列
   //let activeIndex = 0;  //何番目を描画中？
@@ -227,8 +233,15 @@ setActive(index) {
   // 最新のレイヤー情報でリストを再構築
   this.layers.forEach((layer, index) => {
     const item = document.createElement("div");
-    item.className = "layer-item";
-    item.textContent = layer.name + (index === this.AI ? "（選択中）" : "");
+    item.className = "layer-item" + (index === this.AI ? " active-layer" : "");
+    item.textContent = layer.name;
+    //item.textContent = layer.name + (index === this.AI ? "（選択中）" : "");
+
+    const deleteButton = document.createElement("div");
+    deleteButton.className = "delete-button" + (index === this.AI ? " active-layer" : "");
+    deleteButton.textContent = "✕";
+    deleteButton.dataset.index = index;
+
 
     // レイヤーを選択するクリックイベント
     item.addEventListener("click", () => {
@@ -236,7 +249,14 @@ setActive(index) {
       this.renderLayerPanel(); // 再描画して選択表示を更新
     });
 
+    //削除ボタンの実装
+    deleteButton.addEventListener("click", () => {
+    e.stopPropagation(); // レイヤー選択に波及させない
+    manager.removeLayer(deleteButton.dataset.index);
+    });
+
     panel.prepend(item);
+    item.appendChild(deleteButton)
   });
 }
 }
@@ -338,6 +358,14 @@ function applyBrushStyle(tools){
   tools.lineCap = "round";
   tools.lineJoin = "round";
 }
+//レイヤーの追加
+addLayerBtn.addEventListener("click", () => {
+  console.log("add-layer pushed!");
+  manager.addLayer()
+});
+addLayerFTBtn.addEventListener("click", () => {
+  console.log("add-layer-from-tags pushed!");
+});
 
 // 🎨 ペンの太さ変更
 brushWidthSlider.addEventListener('input', () => {
