@@ -226,39 +226,45 @@ setActive(index) {
       active: index === this.AI,
     }));
   }
-  renderLayerPanel() {
+renderLayerPanel() {
   const panel = document.getElementById("layer-panel");
-  panel.innerHTML = ""; // 一旦クリア
+  panel.innerHTML = "";
 
-  // 最新のレイヤー情報でリストを再構築
   this.layers.forEach((layer, index) => {
     const item = document.createElement("div");
-    item.className = "layer-item" + (index === this.AI ? " active-layer" : "");
-    item.textContent = layer.name;
-    //item.textContent = layer.name + (index === this.AI ? "（選択中）" : "");
+    item.className = "layer-item";
+    if (index === this.AI) item.classList.add("active-layer");
 
-    const deleteButton = document.createElement("div");
-    deleteButton.className = "delete-button" + (index === this.AI ? " active-layer" : "");
+    // ▶ レイヤー名（spanで分離）
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "layer-name";
+    nameSpan.textContent = layer.name;
+
+    // ▶ 削除ボタン（既存のやつでもOK）
+    const deleteButton = document.createElement("button");
     deleteButton.textContent = "✕";
+    deleteButton.className = "delete-button";
     deleteButton.dataset.index = index;
 
+    deleteButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.removeLayer(index);
+    });
 
-    // レイヤーを選択するクリックイベント
+
+
+    // ▶ レイヤー選択
     item.addEventListener("click", () => {
-      this.setActive(index);  //も呼ばれるようにしてクリックと結びつける
-      this.renderLayerPanel(); // 再描画して選択表示を更新
+      this.setActive(index);
+      this.renderLayerPanel();
     });
 
-    //削除ボタンの実装
-    deleteButton.addEventListener("click", () => {
-    e.stopPropagation(); // レイヤー選択に波及させない
-    manager.removeLayer(deleteButton.dataset.index);
-    });
-
+    item.appendChild(nameSpan);
+    item.appendChild(deleteButton);
     panel.prepend(item);
-    item.appendChild(deleteButton)
   });
 }
+
 }
 
 class DrawManager {
