@@ -137,25 +137,34 @@ setActive(index) {
   }
 }
 
-  removeLayer(index) {
-    if (this.layers.length <= 1) {
-      alert("エラー：レイヤーを0枚にすることはできません。");
-      return false;
-    }
-
-    const layer = this.layers[index];
-    if (!layer) return false;
-
-
-    this.wrapper.removeChild(layer.canvas);
-    this.layers.splice(index, 1);
-
-    if (this.AI >= this.layers.length) {
-      this.AI = this.layers.length - 1;
-    }
-    this.renderLayerPanel();
-    return true;
+removeLayer(index) {
+  // --- レイヤーが1枚しかないときは中止 ---
+  if (this.layers.length <= 1) {
+    alert("エラー：レイヤーを0枚にすることはできません。");
+    return false;
   }
+
+  const layer = this.layers[index];
+  if (!layer) return false;
+
+  // --- キャンバスを削除 ---
+  this.wrapper.removeChild(layer.canvas);
+
+  // --- レイヤーを削除 ---
+  this.layers.splice(index, 1);
+
+  // --- AIが削除された位置より後にあるならインデックスを調整 ---
+  if (index < this.AI) {
+    this.AI -= 1;  // 前が消えたのでずれる
+  } else if (index === this.AI) {
+    // 自分自身が消された場合 → 直後 or 最後尾にずらす
+    this.AI = Math.min(this.AI, this.layers.length - 1);
+  }
+
+  this.renderLayerPanel();
+  return true;
+}
+
 
   renameLayer(index, newName) {
     const layer = this.layers[index];
@@ -230,65 +239,79 @@ renderLayerPanel() {
   const panel = document.getElementById("layer-panel");
   panel.innerHTML = "";
 
-this.layers.forEach((layer, index) => {
-  const item = document.createElement("div");
-  item.className = "layer-item";
-  if (index === this.AI) item.classList.add("active-layer");
+  this.layers.forEach((layer, index) => {
+    const item = document.createElement("div");
+    item.className = "layer-item";
+    if (index === this.AI) item.classList.add("active-layer");
 
-  // --- レイヤー名表示 ---
-  const nameSpan = document.createElement("span");
-  nameSpan.className = "layer-name";
-  nameSpan.textContent = layer.name;
+    // --- レイヤー名表示 ---
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "layer-name";
+    nameSpan.textContent = layer.name;
 
-  // ★ ダブルクリックでリネーム開始 ★
-  nameSpan.addEventListener("dblclick", (e) => {
-    e.stopPropagation();           // レイヤー選択クリックを無効化
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = layer.name;
-    input.className = "rename-input";
+    // --- ダブルクリックでリネーム ---
+    nameSpan.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
 
-    const finish = (confirm = true) => {
-      if (confirm) {
-        const newName = input.value.trim() || layer.name;
-        this.renameLayer(index, newName);
-      } else {
-        this.renderLayerPanel();   // キャンセル時は元に戻す
-      }
-    };
+      const input = document.createElement("input");
+      input.type = "text";
+      input.value = layer.name;
+      input.className = "rename-input";
 
-    input.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") finish(true);
-      if (ev.key === "Escape") finish(false);
+      const finish = (ok = true) => {
+        if (ok) {
+          const newName = input.value.trim() || layer.name;
+          this.renameLayer(index, newName);
+        } else {
+          this.renderLayerPanel(); // キャンセル時は元に戻す
+        }
+      };
+
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") finish(true);
+        if (ev.key === "Escape") finish(false);
+      });
+      input.addEventListener("blur", () => finish(true));
+
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
     });
-    input.addEventListener("blur", () => finish(true));
 
-    nameSpan.replaceWith(input);
-    input.focus();
-    input.select();
+    // --- レイヤー選択（再描画なし） ---
+    item.addEventListener("click", () => {
+      this.setActive(index);              // AIだけ切り替え
+      this.updateActiveHighlight();       // DOMを差し替えない！
+    });
+
+    // --- 削除ボタン ---
+    const deleteButton = document.createElement("button");
+    deleteButton.textContent = "✕";
+    deleteButton.className = "delete-button";
+    deleteButton.dataset.index = index;
+
+    deleteButton.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.removeLayer(index);            // この中でrenderLayerPanel()が呼ばれる
+    });
+
+    item.appendChild(nameSpan);
+    item.appendChild(deleteButton);
+    panel.prepend(item);
   });
-
-  // --- 削除ボタン ---
-  const deleteButton = document.createElement("button");
-  deleteButton.textContent = "✕";
-  deleteButton.className = "delete-button";
-  deleteButton.dataset.index = index;
-  deleteButton.addEventListener("click", (e) => {
-    e.stopPropagation();
-    this.removeLayer(index);
-  });
-
-  // --- レイヤー選択 ---
-  item.addEventListener("click", () => {
-    this.setActive(index);
-    this.renderLayerPanel();
-  });
-
-  item.appendChild(nameSpan);
-  item.appendChild(deleteButton);
-  panel.prepend(item);
-});
 }
+
+
+updateActiveHighlight() {
+  const items = document.querySelectorAll("#layer-panel .layer-item");
+  const n = this.layers.length;
+  items.forEach((row, i) => {
+    // 見た目 i=0 が layers[n-1] に対応する
+    const correspondingIndex = n - 1 - i;
+    row.classList.toggle("active-layer", correspondingIndex === this.AI);
+  });
+}
+
 
 }
 
