@@ -91,6 +91,7 @@ canvas {
   background-color: #f0f0f0;
   border-left: 1px solid #ccc;
   padding: 10px;
+  cursor: pointer;
 }
 .layer-item {
     justify-content: space-between; /* ← 両端に配置 */
@@ -118,6 +119,7 @@ canvas {
 #layer-container{
   background-color: #f0f0f0;
   border:2px solid #000;
+  cursor: pointer;
 }
 #add-layer,#add-layer-from-tags{
   width: 100%;
@@ -135,13 +137,12 @@ canvas {
   font-size: 15px;
   background-color: rgb(180, 0, 0);
   color: white;
-
+  cursor: pointer;
   width: 24px;        /* 正方形になるよう指定 */
   height: 24px;
   line-height: 24px;  /* テキスト縦中央用 */
   text-align: center; /* テキスト横中央用 */
   margin-left: auto;  /* 右寄せしたい場合 */
-  cursor: pointer;    /* ホバー時にポインタ表示 */
   border-radius: 4px; /* 角丸にするなら */
 }
 .delete-button:hover{
@@ -153,6 +154,39 @@ canvas {
   line-height: 28px;  /* テキスト縦中央用 */
   text-align: center; /* テキスト横中央用 */
   margin-left: auto;  /* 右寄せしたい場合 */
-  cursor: pointer;    /* ホバー時にポインタ表示 */
-  border-radius: 4px; /* 角丸にするなら */
+  border-radius: 4px; /* 角丸 */
+  outline:2px solid #000;
+}
+.delete-button:active{
+  font-size: 20px;
+  background-color: rgb(255, 255, 255);
+  color: white;
+    width: 28px;        /* 正方形になるよう指定 */
+  height: 28px;
+  line-height: 28px;  /* テキスト縦中央用 */
+  text-align: center; /* テキスト横中央用 */
+  margin-left: auto;  /* 右寄せしたい場合 */
+  border-radius: 4px; /* 角丸 */
+  outline:2px solid #000;
+}
+
+.rename-input {
+  width: 90%;
+  font-size: 16px;
+  padding: 2px;
+  background-color: white
+}
+
+#mode-toggle:hover{
+  background-color: #0159dd;
+  color: white;
+  font-weight: bold;
+  outline:2px solid #000;
+}
+
+#mode-toggle:active{
+  background-color: #dd0101;
+  color: white;
+  font-weight: bold;
+  outline:2px solid #000;
 }
