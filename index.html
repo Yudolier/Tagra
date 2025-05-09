@@ -73,9 +73,7 @@ const cursorCtx = cursorCanvas.getContext("2d");
 
     let lastX = 0;
     let lastY = 0;
-//レイヤーをclassにする
-//name以外は勝手に決まる（layer.canvasとかで引き出せる）
-//Layerはname(という文字列),canvas,ctxからなるオブジェクトになる！
+
 class Layer {
   constructor(name) {
     this.name = name;
@@ -84,19 +82,6 @@ class Layer {
     this.visible = true;
   }
 }
-/*function addLayer(wrapper, layers) {
-  const index = layers.length + 1;  // ← 今から追加されるレイヤー番号 0番目が1
-  const layer = new Layer(`Layer ${index}`);  //スコープok!
-  layer.canvas.style.zIndex = index;
-  wrapper.appendChild(layer.canvas);
-    // ★ 追加： wrapper と同じピクセル解像度を設定
-    const { clientWidth:w, clientHeight:h } = wrapper;
-  layer.canvas.width  = w;
-  layer.canvas.height = h;
-  layers.push(layer);
-  return layer;
-}
-*/
 class LayerManager {
   constructor(wrapper) {
     this.wrapper = wrapper;
@@ -256,6 +241,7 @@ setActive(index) {
   });
 }
 }
+
 class DrawManager {
   constructor(wrapper, cursorCanvas, layerManager) {
     this.wrapper       = wrapper;
@@ -273,7 +259,7 @@ class DrawManager {
     wrapper.addEventListener('pointerleave', e => this.onUp(e));
   }
 
-  /* 座標を wrapper → アクティブキャンバス座標へ変換 */
+  //座標を wrapper → アクティブキャンバス座標へ変換
   toCanvas(e) {
     const rect = this.wrapper.getBoundingClientRect();
     const scaleX = this.wrapper.clientWidth  ? (this.wrapper.querySelector('canvas').width  / rect.width)  : 1;
@@ -284,7 +270,7 @@ class DrawManager {
     };
   }
 
-  /* pointerdown */
+  //pointerdown
   onDown(e) {
     this.isDrawing = true;
     const {x, y} = this.toCanvas(e);
@@ -292,7 +278,7 @@ class DrawManager {
     this.drawDot(x, y);              // クリック点を 1 ドット描く
   }
 
-  /* pointermove */
+  //pointermove
   onMove(e) {
     // カーソルプレビュー（省略可）
     this.updateCursorPreview(e);
@@ -313,13 +299,13 @@ class DrawManager {
     this.lastX = x; this.lastY = y;
   }
 
-  /* pointerup / pointerleave */
+  //pointerup, pointerleave
   onUp(e) {
     this.isDrawing = false;
     this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
   }
 
-  /* クリック点を丸で埋める（ペン／消しゴム共用） */
+  // クリック点を丸で埋める関数（ペン／消しゴム共用）
   drawDot(x, y) {
     const ctx  = this.layerManager.getActiveLayer().ctx;
     const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
@@ -333,14 +319,14 @@ class DrawManager {
     ctx.restore();
   }
 
-  /* カーソルプレビュー */
+  //カーソルプレビュー
   updateCursorPreview(e) {
     const {x, y} = this.toCanvas(e);
     const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
 
     this.cursorCtx.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
     this.cursorCtx.lineWidth = 1;
-    this.cursorCtx.strokeStyle = isErasing ? 'rgba(0,0,0,0.3)' : this.layerManager.getActiveLayer().ctx.strokeStyle;
+    this.cursorCtx.strokeStyle = 'rgba(0,0,0,0.6)';
     this.cursorCtx.beginPath();
     this.cursorCtx.arc(x, y, size/2, 0, Math.PI*2);
     this.cursorCtx.stroke();
@@ -413,125 +399,6 @@ eraserIncreaseBtn.addEventListener('click', () => {
 });
 
 
-function setupEvents(layer) {
-  console.log("setupEvents called for:", layer.name);
-  const canvas = layer.canvas;
-  const ctx    = layer.ctx;
-
-  canvas._onPointerDown = function(e){
-    console.log("↓ pointerdown", e);
-    // 押された時に書いてるよとフラグを立てる
-    isDrawing = true;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width  / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top ) * scaleY;
-    [lastX, lastY] = [x, y];
-    // クリック時点で1ドット描画
-  const ctx = layer.ctx;
-  const size = isErasing
-    ? parseInt(eraserWidthSlider.value, 10)
-    : parseInt(brushWidthSlider.value, 10);
-
-  ctx.lineWidth = size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  ctx.beginPath();
-  ctx.arc(x, y, size / 2, 0, Math.PI * 2);
-  ctx.fillStyle = ctx.strokeStyle;
-  if (isErasing) {
-    ctx.globalCompositeOperation = 'destination-out';
-  } else {
-    ctx.globalCompositeOperation = 'source-over';
-  }
-  ctx.fill();
-
-    canvas.setPointerCapture(e.pointerId);
-  };
-
-  canvas._onPointerMove = function(e) {
-  const pressure = e.pressure ?? 0.5; // pressureは0〜1（なければ0.5くらいに）
-  console.log("筆圧:", pressure);
-  // ① キャンバスの表示上の位置とサイズを取得
-  const ctx = layer.ctx;  //別のスコープを持つので取りに行く
-  const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width  / rect.width;
-  const scaleY = canvas.height / rect.height;
-
-  // ② イベントの位置（画面上）→ キャンバス内部座標に変換
-  const x = (e.clientX - rect.left) * scaleX;
-  const y = (e.clientY - rect.top ) * scaleY;
-
-  // ③ カーソルプレビューの描画
-  cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-  const size = isErasing
-    ? parseInt(eraserWidthSlider.value, 10)
-    : parseInt(brushWidthSlider.value, 10);
-
-  cursorCtx.lineWidth = 1;
-  cursorCtx.strokeStyle = isErasing ? "rgba(0,0,0,0.3)" : ctx.strokeStyle;
-
-  cursorCtx.beginPath();
-  cursorCtx.arc(x, y, size / 2, 0, Math.PI * 2);
-  cursorCtx.stroke();
-
-  // ④ 実際の描画処理
-  if (!isDrawing || e.buttons !== 1) return;
-
-  ctx.lineWidth = size;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(x, y);
-  ctx.stroke();
-
-  [lastX, lastY] = [x, y];
-
-};
-
-
-  // マウスを離すと書いてないよになってpointermoveが無効化される。カーソルも消す
-  // アロー関数を使用(簡単な記法)
-  canvas._onPointerUp    = (e) => {
-    console.log("↑ pointerup", e);
-    isDrawing = false;
-    canvas.releasePointerCapture(e.pointerId);
-  }
-  canvas._onPointerLeave = (e) => {
-    console.log("pointerleave", e);
-    isDrawing = false;
-    canvas.releasePointerCapture(e.pointerId);
-    cursorCtx.clearRect(0, 0, cursorCanvas.width, cursorCanvas.height);
-  };
-}
-
-// イベントリスナーを登録する関数
-function attachDrawEvents(layer) {
-  const canvas = layer.canvas;
-  canvas.addEventListener("pointerdown",  canvas._onPointerDown);
-  canvas.addEventListener("pointermove",  canvas._onPointerMove);
-  canvas.addEventListener("pointerup",    canvas._onPointerUp);
-  canvas.addEventListener("pointerleave", canvas._onPointerLeave);
-}
-
-// イベントリスナーを削除する関数
-function detachDrawEvents(layer) {
-  const canvas = layer.canvas;
-  canvas.removeEventListener("pointerdown",  canvas._onPointerDown);
-  canvas.removeEventListener("pointermove",  canvas._onPointerMove);
-  canvas.removeEventListener("pointerup",    canvas._onPointerUp);
-  canvas.removeEventListener("pointerleave", canvas._onPointerLeave);
-
-  //delete canvas._onPointerDown;
-  //delete canvas._onPointerMove;
-  //delete canvas._onPointerUp;
-  //delete canvas._onPointerLeave;
-}
-*/
   </script>
 
   <script>// カラーピッカーのスクリプト。
@@ -589,7 +456,8 @@ function resizeCanvases() {
   manager.renderLayerPanel();
   resizeCanvases();
   updateBrushColor(); // カラーピッカーの初期化
-  manager.addLayer();//for debug
+  manager.addLayer();
+  manager.addLayer();//for test
   DM = new DrawManager(wrapper, cursorCanvas, manager);
 });
 </script>
