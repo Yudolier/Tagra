@@ -424,9 +424,8 @@ class LayerManager {
 // ───────── ToolManager（筆箱） ─────────
 class ToolManager {
   constructor() {
-    // canvas → レイヤー上の座標変換関数
     const toCanvas = e => {
-      const rect = wrapper.getBoundingClientRect();
+      const rect   = wrapper.getBoundingClientRect();
       const scaleX = wrapper.clientWidth  / rect.width;
       const scaleY = wrapper.clientHeight / rect.height;
       return {
@@ -435,35 +434,41 @@ class ToolManager {
       };
     };
 
-    this.current = null;  // 現在の道具
-    // 筆箱の中身をここで全部定義
+    this.current = null;
     this.tools = {
       brush: {
         name: 'Brush',
+        isDrawing: false,          // ← 追加
         onDown(e, { drawTools }) {
+          this.isDrawing = true;   // ← 追加
           const p = toCanvas(e);
           drawTools.beginPath();
           drawTools.moveTo(p.x, p.y);
           this.last = p;
         },
         onMove(e, { drawTools }) {
+          if (!this.isDrawing) return;  // ← 追加
           const p = toCanvas(e);
           drawTools.lineTo(p.x, p.y);
           drawTools.stroke();
           this.last = p;
         },
-        onUp() {
+        onUp(e, { drawTools }) {
+          this.isDrawing = false;  // ← 追加
           this.last = null;
         }
       },
+
       eraser: {
         name: 'Eraser',
+        isDrawing: false,          // ← 追加
         onDown(e, { drawTools }) {
           drawTools.save();
           drawTools.globalCompositeOperation = 'destination-out';
           this.tools.brush.onDown.call(this, e, { drawTools });
         },
         onMove(e, { drawTools }) {
+          if (!this.isDrawing) return;  // ← 追加
           this.tools.brush.onMove.call(this, e, { drawTools });
         },
         onUp(e, { drawTools }) {
@@ -471,14 +476,18 @@ class ToolManager {
           this.tools.brush.onUp.call(this, e, { drawTools });
         }
       },
+
       nagenawaFill: {
         name: 'NagenawaFill',
+        isDrawing: false,          // ← 追加
         points: [],
         onDown(e, { previewTools }) {
+          this.isDrawing = true;   // ← 追加
           this.points = [ toCanvas(e) ];
           previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
         },
         onMove(e, { previewTools }) {
+          if (!this.isDrawing) return;  // ← 追加
           const p = toCanvas(e);
           this.points.push(p);
           previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
@@ -502,18 +511,17 @@ class ToolManager {
           drawTools.fill();
           drawTools.restore();
           this.points = [];
+          this.isDrawing = false;  // ← 追加
         }
       }
     };
   }
 
-  // 道具を選ぶ
   select(name) {
     if (!this.tools[name]) throw new Error(`ツール「${name}」が見つかりません`);
     this.current = this.tools[name];
   }
 
-  // イベントを丸投げ
   onDown(e, ctxs) { this.current?.onDown?.(e, ctxs); }
   onMove(e, ctxs) { this.current?.onMove?.(e, ctxs); }
   onUp(e,   ctxs) { this.current?.onUp?.(e,   ctxs); }
@@ -523,150 +531,128 @@ class ToolManager {
 const toolMgr = new ToolManager();
 // 最初はブラシを選択
 toolMgr.select('brush');
-
-class DrawManager {
-  constructor(wrapper, cursorCanvas, layerManager) {
+// ───────── CursorManager ─────────
+class CursorManager {
+  constructor(wrapper, cursorCanvas, toolMgr, brushSlider, eraserSlider) {
     this.wrapper       = wrapper;
-    this.cursorCanvas  = cursorCanvas;
-    this.cursorTools     = cursorCanvas.getContext('2d');
-    this.layerManager  = layerManager;
+    this.canvas        = cursorCanvas;
+    this.tools         = cursorCanvas.getContext('2d');
+    this.toolMgr       = toolMgr;
+    this.brushSlider   = brushSlider;
+    this.eraserSlider  = eraserSlider;
 
-    this.isDrawing = false;
-    this.lastX = this.lastY = 0;
+    // サイズ合わせ
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
 
-    // 「描画前」を保持する変数
-    this._beforeImage  = null;
-
-    //ToolManager仕様に変更
-wrapper.addEventListener('pointerdown', e =>
-  toolMgr.onDown(e, {
-    drawTools:    manager.getActiveLayer().tools,
-    previewTools: cursorTools
-  })
-);
-wrapper.addEventListener('pointermove', e =>
-  toolMgr.onMove(e, {
-    drawTools:    manager.getActiveLayer().tools,
-    previewTools: cursorTools
-  })
-);
-wrapper.addEventListener('pointerup', e =>
-  toolMgr.onUp(e, {
-    drawTools:    manager.getActiveLayer().tools,
-    previewTools: cursorTools
-  })
-);
-
+    // マウス動かすたびに描画
+    wrapper.addEventListener('pointermove', e => this.draw(e));
   }
 
-  //座標を wrapper → アクティブキャンバス座標へ変換
+  resize() {
+    const rect = this.wrapper.getBoundingClientRect();
+    this.canvas.width  = rect.width;
+    this.canvas.height = rect.height;
+  }
+
+  draw(e) {
+    const rect   = this.wrapper.getBoundingClientRect();
+    const scaleX = this.canvas.width  / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top)  * scaleY;
+
+    // ツールに応じたサイズ取得
+    const size = this.toolMgr.current.name === 'Eraser'
+      ? +this.eraserSlider.value
+      : +this.brushSlider.value;
+
+    // クリアしてからリング描画
+    this.tools.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.tools.beginPath();
+    this.tools.lineWidth   = 1;
+    this.tools.strokeStyle = 'rgba(0,0,0,0.6)';
+    this.tools.arc(x, y, size/2, 0, Math.PI*2);
+    this.tools.stroke();
+  }
+}
+
+const cursorMgr    = new CursorManager(
+  wrapper, cursorCanvas, toolMgr,
+  brushWidthSlider, eraserWidthSlider
+);
+
+// ───────── DrawManager（カーソル機能なし版） ─────────
+class DrawManager {
+  constructor(wrapper, layerManager) {
+    this.wrapper      = wrapper;
+    this.layerManager = layerManager;
+    this.isDrawing    = false;
+    this.lastX        = 0;
+    this.lastY        = 0;
+    this.beforeImage  = null;
+
+    wrapper.addEventListener('pointerdown',  e => this.onDown(e));
+    wrapper.addEventListener('pointermove',  e => this.onMove(e));
+    wrapper.addEventListener('pointerup',    e => this.onUp(e));
+    wrapper.addEventListener('pointerleave', e => this.onUp(e));
+  }
+
   toCanvas(e) {
     const rect = this.wrapper.getBoundingClientRect();
-    const scaleX = this.wrapper.clientWidth  ? (this.wrapper.querySelector('canvas').width  / rect.width)  : 1;
-    const scaleY = this.wrapper.clientHeight ? (this.wrapper.querySelector('canvas').height / rect.height) : 1;
+    const scaleX = this.wrapper.clientWidth  / rect.width;
+    const scaleY = this.wrapper.clientHeight / rect.height;
     return {
       x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top)  * scaleY,
+      y: (e.clientY - rect.top)  * scaleY
     };
   }
 
-  //pointerdown
   onDown(e) {
     this.isDrawing = true;
-
-    const activeLayer = this.layerManager.getActiveLayer();
-    if (activeLayer) {
-      const ctx = activeLayer.tools;
-      // 描き始め直前の全体イメージを取得
-      this.beforeImage = ctx.getImageData(
-        0, 0,
-        activeLayer.canvas.width,
-        activeLayer.canvas.height
-      );
+    const layer = this.layerManager.getActiveLayer();
+    if (layer) {
+      // 履歴用スナップショット
+      this.beforeImage = layer.tools.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
     }
-
-    const {x, y} = this.toCanvas(e);
-    this.lastX = x; this.lastY = y;
-    this.drawDot(x, y);              // クリック点を 1 ドット描く
+    const { x, y } = this.toCanvas(e);
+    this.lastX = x;
+    this.lastY = y;
+    // 1ドットだけでも描く
+    const ctx = this.layerManager.getActiveLayer().tools;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x+0.01, y+0.01);
+    ctx.stroke();
   }
 
-  //pointermove
   onMove(e) {
-    // カーソルプレビュー（省略可）
-    this.updateCursorPreview(e);
-
     if (!this.isDrawing || e.buttons !== 1) return;
-    const {x, y} = this.toCanvas(e);
-
-    const tools  = this.layerManager.getActiveLayer().tools;
-    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
-
-    tools.lineWidth = size;
-    tools.lineCap = tools.lineJoin = 'round';
-    tools.beginPath();
-    tools.moveTo(this.lastX, this.lastY);
-    tools.lineTo(x, y);
-    tools.stroke();
-
-    this.lastX = x; this.lastY = y;
+    const { x, y } = this.toCanvas(e);
+    const ctx = this.layerManager.getActiveLayer().tools;
+    ctx.beginPath();
+    ctx.moveTo(this.lastX, this.lastY);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    this.lastX = x;
+    this.lastY = y;
   }
 
-  //pointerup, pointerleave
- onUp(e) {
+  onUp(e) {
     if (!this.isDrawing) return;
     this.isDrawing = false;
-
-    const activeLayer = this.layerManager.getActiveLayer();
-    if (activeLayer && this.beforeImage) {
-      const ctx = activeLayer.tools;
-      // 描き終わったあとのイメージを取得
-      const afterImage = ctx.getImageData(
-        0, 0,
-        activeLayer.canvas.width,
-        activeLayer.canvas.height
-      );
-      // 履歴に登録
-    const snapBefore = this.beforeImage;  // ← 今の状態をローカル変数に保存！
-    appHistory.push({
-      undo: () => ctx.putImageData(snapBefore, 0, 0),
-      redo: () => ctx.putImageData(afterImage,    0, 0)
-    });
-    this.beforeImage = null;
+    const layer = this.layerManager.getActiveLayer();
+    if (layer && this.beforeImage) {
+      const ctx = layer.tools;
+      const after = ctx.getImageData(0, 0, layer.canvas.width, layer.canvas.height);
+      // 履歴登録
+      const snapBefore = this.beforeImage;
+      appHistory.push({
+        undo: () => ctx.putImageData(snapBefore, 0, 0),
+        redo: () => ctx.putImageData(after,    0, 0)
+      });
+      this.beforeImage = null;
     }
-
-    // カーソルプレビューのクリア
-    this.cursorTools.clearRect(
-      0, 0,
-      this.cursorCanvas.width,
-      this.cursorCanvas.height
-    );
-  }
-
-  // クリック点を丸で埋める関数（ペン／消しゴム共用）
-  drawDot(x, y) {
-    const tools  = this.layerManager.getActiveLayer().tools;
-    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
-
-    tools.save();
-    tools.lineWidth = 0;
-    tools.fillStyle = tools.strokeStyle;
-    tools.beginPath();
-    tools.arc(x, y, size/2, 0, Math.PI*2);
-    tools.fill();
-    tools.restore();
-  }
-
-  //カーソルプレビュー
-  updateCursorPreview(e) {
-    const {x, y} = this.toCanvas(e);
-    const size = isErasing ? +eraserWidthSlider.value : +brushWidthSlider.value;
-
-    this.cursorTools.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
-    this.cursorTools.lineWidth = 1;
-    this.cursorTools.strokeStyle = 'rgba(0,0,0,0.6)';
-    this.cursorTools.beginPath();
-    this.cursorTools.arc(x, y, size/2, 0, Math.PI*2);
-    this.cursorTools.stroke();
   }
 }
 
@@ -861,7 +847,7 @@ function resizeCanvases() {
   appHistory.reset();
   manager.addLayer();
   manager.addLayer();//for test
-  DM = new DrawManager(wrapper, cursorCanvas, manager);
+  DM = new DrawManager(wrapper, manager);
 });
 
 // キーボードショートカットで undo / redo を実行
