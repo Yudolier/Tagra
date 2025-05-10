@@ -303,23 +303,42 @@ class LayerManager {
       nameSpan.textContent = layer.name;
       nameSpan.setAttribute("draggable", false);
       nameSpan.addEventListener("dblclick", e => {
-        e.stopPropagation();
-        const input = document.createElement("input");
-        input.type = "text";
-        input.value = layer.name;
-        input.className = "rename-input";
-        const finish = ok => {
-          if (ok) this.renameLayer(idx, input.value.trim() || layer.name);
-          else    this.renderLayerPanel();
-        };
-        input.addEventListener("keydown", ev => {
-          if (ev.key === "Enter")  finish(true);
-          if (ev.key === "Escape") finish(false);
-        });
-        input.addEventListener("blur", () => finish(true));
-        nameSpan.replaceWith(input);
-        input.focus(); input.select();
-      });
+  e.stopPropagation();
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = layer.name;
+  input.className = "rename-input";
+
+  let confirmed = false;
+
+  const finish = ok => {
+    if (ok) this.renameLayer(idx, input.value.trim() || layer.name);
+    else    this.renderLayerPanel();
+    document.removeEventListener("mousedown", cancelIfOutside);
+  };
+
+  const cancelIfOutside = ev => {
+    if (!input.contains(ev.target)) {
+      finish(false);
+    }
+  };
+
+  input.addEventListener("keydown", ev => {
+    if (ev.key === "Enter")  { confirmed = true; finish(true); }
+    if (ev.key === "Escape") { confirmed = false; finish(false); }
+  });
+
+  input.addEventListener("blur", () => {
+    if (confirmed) return; // Enterで確定済なら何もしない
+    // 確定前にフォーカス外れたらキャンセル（外クリック含む）
+    finish(false);
+  });
+
+  document.addEventListener("mousedown", cancelIfOutside);
+  nameSpan.replaceWith(input);
+  input.focus(); input.select();
+});
+
 
       // 選択
       item.addEventListener("click", () => { this.setActive(idx); });
