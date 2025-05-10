@@ -322,15 +322,33 @@ renderLayerPanel() {
   });
 
   // --- パネル全体で dragover/drop を処理 ---
-  panel.addEventListener("dragover", e => {
-    e.preventDefault();
-    const tgt = e.target.closest(".layer-item");
-    if (!tgt) return;
-    const rect = tgt.getBoundingClientRect();
-    const before = e.clientY < rect.top + rect.height / 2;
-    dropIndicator.style.display = "block";
-    panel.insertBefore(dropIndicator, before ? tgt : tgt.nextSibling);
-  });
+panel.addEventListener("dragover", e => {
+  e.preventDefault();
+  if (draggedLayerIndex == null) return;
+
+  const tgt = e.target.closest(".layer-item");
+  if (!tgt) return;
+
+  /* --- ① 行の中心線で上/下を判定 ----------------------- */
+  const rect       = tgt.getBoundingClientRect();
+  const insertBefore = e.clientY < rect.top + rect.height / 2;
+
+  /* --- ② プレビューを挿入 ------------------------------ */
+  dropIndicator.style.display = "block";
+  panel.insertBefore(dropIndicator,
+    insertBefore ? tgt : tgt.nextSibling
+  );
+
+  /* --- ③ 実際の挿入 index を計算（下方向は -1 補正） --- */
+  const rows   = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
+  let visIdx   = rows.indexOf(dropIndicator);
+  let target   = this.layers.length - 1 - visIdx;
+  if (target > draggedLayerIndex) target -= 1;
+
+  /* --- ④ 矢印向きを移動方向で切替 --------------------- */
+  dropIndicator.classList.toggle("below", target > draggedLayerIndex);
+});
+
 
 panel.addEventListener("drop", e => {
   e.preventDefault();
@@ -360,7 +378,7 @@ const movedLayer = this.layers.splice(draggedLayerIndex, 1)[0];
 let insertionIndex = targetLayerIndex;
 if (insertionIndex > draggedLayerIndex) {
   // 下方向の場合、配列は 1 つ短くなっているので -1 する
-  insertionIndex -= 1;
+  //insertionIndex -= 1;
 }
 
 // ★★ ここで実際に挿入 ★★
@@ -487,6 +505,37 @@ class DrawManager {
   }
 }
 
+class History {
+  constructor(limit = 100) {
+    this.historyStack   = [];    // { undo: Function, redo: Function } の配列
+    this.pointer = -1;    // 現在適用中の操作インデックス
+    this.limit   = limit; // 最大保持数
+  }
+
+  push(action) {
+    if (this.pointer < this.historyStack.length - 1) {
+      this.historyStack.splice(this.pointer + 1); // 結果が分岐する
+    }
+    this.historyStack.push(action);
+    if (this.historyStack.length > this.limit) {
+      this.historyStack.shift();  // 最初の1つを削除
+    } else {
+      this.pointer++;
+    }
+  }
+
+  undo() {
+    if (this.pointer < 0) return;
+    this.historyStack[this.pointer].undo();
+    this.pointer--;
+  }
+
+  redo() {
+    if (this.pointer >= this.historyStack.length - 1) return;
+    this.pointer++;
+    this.historyStack[this.pointer].redo();
+  }
+}
 
 
 function applyBrushStyle(tools){
