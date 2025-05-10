@@ -217,3 +217,10 @@ canvas {
   height: 0; border-top: 5px solid rgb(255, 0, 140);  /* 好きな色に */
   margin: 0 4px;
 }
+.drag-placeholder {
+  height: 32px;                       /* 行の高さと合わせる */
+  background: rgba(56,168,255,0.15);  /* 薄い色で枠感を出す */
+  border: 1px dashed #38a;
+  box-sizing: border-box;
+  margin: 4px 0;
+}
