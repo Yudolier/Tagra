@@ -815,6 +815,7 @@ function resizeCanvases() {
   baseLayer = manager.addLayer()
   manager.renderLayerPanel();
   resizeCanvases();
+  manager.layers.forEach(layer => applyBrushStyle(layer.ctx));  //contextがresizeで消えるので再適用
   updateBrushColor(); // カラーピッカーの初期化
   appHistory.reset();
   manager.addLayer();
