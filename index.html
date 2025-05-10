@@ -338,8 +338,8 @@ panel.addEventListener("drop", e => {
   if (draggedLayerIndex == null) return;
 
   // --- 1. インジケータの位置から表示上の行番号を取得 ---
-  const visiblerows = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
-  const visualDropIndex = visiblerows.indexOf(dropIndicator);
+  const visualRowList = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
+  const visualDropIndex = visualRowList.indexOf(dropIndicator);
 
   // --- 2. 表示順 → 論理順に変換（prepend表示なので逆順） ---
   let targetLayerIndex = this.layers.length - 1 - visualDropIndex;
@@ -354,27 +354,20 @@ panel.addEventListener("drop", e => {
     return;
   }
 
-  // --- 5. 実際に配列を並び替え ---
+// --- 5. movedLayer を抜いたあと、挿入位置を決定 ---
 const movedLayer = this.layers.splice(draggedLayerIndex, 1)[0];
 
-/* ↓↓↓ ここがポイント ↓↓↓ */
 let insertionIndex = targetLayerIndex;
 if (insertionIndex > draggedLayerIndex) {
-  // 下方向へ移動する場合は 1 つ手前にずらす
+  // 下方向の場合、配列は 1 つ短くなっているので -1 する
   insertionIndex -= 1;
 }
 
+// ★★ ここで実際に挿入 ★★
 this.layers.splice(insertionIndex, 0, movedLayer);
 
-
-  // --- 6. アクティブインデックス（AI）補正 ---
-  if (this.AI === draggedLayerIndex) {
-    this.AI = targetLayerIndex;
-  } else if (draggedLayerIndex < this.AI && targetLayerIndex >= this.AI) {
-    this.AI -= 1;
-  } else if (draggedLayerIndex > this.AI && targetLayerIndex <= this.AI) {
-    this.AI += 1;
-  }
+// --- 6. AI（アクティブレイヤ）を new 配列上の正しい位置に ---
+this.AI = this.layers.indexOf(movedLayer);
 
   // --- 7. Z-indexを更新して表示順を正す ---
   this.renderZIndex();
