@@ -675,7 +675,10 @@ redo() {
 function applyBrushStyle(tools){
   tools.lineCap = "round";
   tools.lineJoin = "round";
+  tools.lineWidth = toolMgr.current?.size ?? 2;
+  tools.strokeStyle = manager ? manager.getActiveLayer()?.tools.strokeStyle : "#000";
 }
+
 //レイヤーの追加
 addLayerBtn.addEventListener("click", () => {
   console.log("add-layer pushed!");
