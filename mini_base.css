@@ -224,3 +224,17 @@ canvas {
   box-sizing: border-box;
   margin: 4px 0;
 }
+
+#undo-button:hover,#redo-button:hover{
+  background-color: #0159dd;
+  color: white;
+  font-weight: bold;
+  outline:2px solid #000;
+}
+
+#undo-button:active,#redo-button:active{
+  background-color: #dd0101;
+  color: white;
+  font-weight: bold;
+  outline:2px solid #000;
+}
