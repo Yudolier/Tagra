@@ -51,12 +51,15 @@
     <input type="range" id="alpha" min="0" max="100" value="100">
     <span id="alpha-display">100</span>%<br>
 </div>
-
+<div id="undo-redo">
+  <button id="undo-button">←取り消し</button>
+  <button id="redo-button">やり直し→</button>
+</div>
 <script>
 //Javascriptはbodyの最下部に書く。これはキャンバスとレイヤーのスクリプト
 const wrapper = document.getElementById("canvas-wrapper");
 const cursorCanvas = document.getElementById("cursorCanvas");
-const cursorTools = cursorCanvas.getContext("2d");
+const cursorTools = cursorCanvas.getContext("2d", { willReadFrequently: true });  //読み込み優先
   //ブラシサイズを取得
   const brushWidthSlider = document.getElementById('brush-width');
   const eraserWidthSlider = document.getElementById('eraser-width');
@@ -69,6 +72,9 @@ const cursorTools = cursorCanvas.getContext("2d");
   const eraserIncreaseBtn = document.getElementById('eraser-increase');
   const addLayerBtn = document.getElementById("add-layer");
   const addLayerFTBtn = document.getElementById("add-layer-from-tags");
+  const undoButton = document.getElementById("undo-button");
+  const redoButton = document.getElementById("redo-button");
+  //レイヤーに関連する変数(旧)
   //レイヤーに関連する変数(旧)
   //let layers = [];  //レイヤーというオブジェクトを格納する配列
   //let activeIndex = 0;  //何番目を描画中？
@@ -84,7 +90,7 @@ class Layer {
   constructor(name) {
     this.name = name;
     this.canvas = document.createElement("canvas");
-    this.tools = this.canvas.getContext("2d");
+    this.tools = this.canvas.getContext("2d", { willReadFrequently: true });
     this.visible = true;
   }
 }
@@ -97,24 +103,40 @@ class LayerManager {
     this.nextId = 1;
   }
 
-  addLayer(name = `Layer ${this.nextId++}`) { //使ってから1増やす
-    const layer = new Layer(name);
-    const { clientWidth: w, clientHeight: h } = this.wrapper;
-    layer.canvas.width = w;
-    layer.canvas.height = h;
-    layer.canvas.style.zIndex = this.layers.length + 1;
-    layer.canvas.style.position = "absolute";
-    layer.canvas.style.top = "0";
-    layer.canvas.style.left = "0";
-    this.wrapper.appendChild(layer.canvas);
+addLayer(name = `Layer ${this.nextId++}`, skipHistory = false) {
+  const layer = new Layer(name);
+  const { clientWidth: w, clientHeight: h } = this.wrapper;
 
-    applyBrushStyle(layer.tools);
+  layer.canvas.width = w;
+  layer.canvas.height = h;
+  layer.canvas.style.zIndex = this.layers.length + 1;
+  layer.canvas.style.position = "absolute";
+  layer.canvas.style.top = "0";
+  layer.canvas.style.left = "0";
 
-    this.layers.push(layer);
-    this.AI = this.layers.length - 1;  //レイヤー1のAIは0,追加したらそれがアクティブになる
-    this.renderLayerPanel();
-    return layer;
+  this.wrapper.appendChild(layer.canvas);
+  applyBrushStyle(layer.tools);
+
+  this.layers.push(layer);
+  this.AI = this.layers.length - 1;
+  this.renderLayerPanel();
+
+  // 🎯 履歴に追加（skipHistory が false のときのみ）
+  if (!skipHistory) {
+    const layerIndex = this.layers.length - 1;
+    appHistory.push({
+      undo: () => {
+        this.removeLayer(layerIndex, true); // 削除時も履歴に追加しない
+      },
+      redo: () => {
+        this.addLayer(name, true);         // 再追加（同じ名前、履歴は追加しない）
+      }
+    });
   }
+
+  return layer;
+}
+
 
   getActiveLayer() {
     return this.layers[this.AI] ?? null;
@@ -138,8 +160,7 @@ setActive(index) {
   }
 }
 
-removeLayer(index) {
-  // --- レイヤーが1枚しかないときは中止 ---
+removeLayer(index, skipHistory = false) {
   if (this.layers.length <= 1) {
     alert("エラー：レイヤーを0枚にすることはできません。");
     return false;
@@ -148,23 +169,57 @@ removeLayer(index) {
   const layer = this.layers[index];
   if (!layer) return false;
 
-  // --- キャンバスを削除 ---
-  this.wrapper.removeChild(layer.canvas);
+  // --- Undo用スナップショットを作成 ---
+  const snapshot = {
+    name: layer.name,
+    visible: layer.visible,
+    imageData: layer.tools.getImageData(0, 0, layer.canvas.width, layer.canvas.height),
+    index: index
+  };
 
-  // --- レイヤーを削除 ---
+  // --- 履歴にpush ---
+if (!skipHistory) {
+  appHistory.push({
+    undo: () => {
+      const newLayer = new Layer(snapshot.name);
+      newLayer.visible = snapshot.visible;
+
+      newLayer.canvas.width  = snapshot.imageData.width;
+      newLayer.canvas.height = snapshot.imageData.height;
+      newLayer.canvas.style.position = "absolute";
+      newLayer.canvas.style.top = "0";
+      newLayer.canvas.style.left = "0";
+
+      newLayer.tools.putImageData(snapshot.imageData, 0, 0);
+
+      this.layers.splice(snapshot.index, 0, newLayer);
+      this.wrapper.appendChild(newLayer.canvas);
+      this.renderZIndex();
+      this.AI = snapshot.index;
+      this.renderLayerPanel();
+    },
+    redo: () => {
+      this.removeLayer(snapshot.index, true); // ← push させない
+    }
+  });
+}
+
+
+  // --- キャンバス削除 & 配列から除外 ---
+  this.wrapper.removeChild(layer.canvas);
   this.layers.splice(index, 1);
 
-  // --- AIが削除された位置より後にあるならインデックスを調整 ---
+  // --- AI補正 ---
   if (index < this.AI) {
-    this.AI -= 1;  // 前が消えたのでずれる
+    this.AI -= 1;
   } else if (index === this.AI) {
-    // 自分自身が消された場合 → 直後 or 最後尾にずらす
     this.AI = Math.min(this.AI, this.layers.length - 1);
   }
 
   this.renderLayerPanel();
   return true;
 }
+
 
 
   renameLayer(index, newName) {
@@ -448,6 +503,18 @@ class DrawManager {
   //pointerdown
   onDown(e) {
     this.isDrawing = true;
+
+    const activeLayer = this.layerManager.getActiveLayer();
+    if (activeLayer) {
+      const ctx = activeLayer.tools;
+      // 描き始め直前の全体イメージを取得
+      this.beforeImage = ctx.getImageData(
+        0, 0,
+        activeLayer.canvas.width,
+        activeLayer.canvas.height
+      );
+    }
+
     const {x, y} = this.toCanvas(e);
     this.lastX = x; this.lastY = y;
     this.drawDot(x, y);              // クリック点を 1 ドット描く
@@ -475,9 +542,34 @@ class DrawManager {
   }
 
   //pointerup, pointerleave
-  onUp(e) {
+ onUp(e) {
+    if (!this.isDrawing) return;
     this.isDrawing = false;
-    this.cursorTools.clearRect(0,0,this.cursorCanvas.width,this.cursorCanvas.height);
+
+    const activeLayer = this.layerManager.getActiveLayer();
+    if (activeLayer && this.beforeImage) {
+      const ctx = activeLayer.tools;
+      // 描き終わったあとのイメージを取得
+      const afterImage = ctx.getImageData(
+        0, 0,
+        activeLayer.canvas.width,
+        activeLayer.canvas.height
+      );
+      // 履歴に登録
+    const snapBefore = this.beforeImage;  // ← 今の状態をローカル変数に保存！
+    appHistory.push({
+      undo: () => ctx.putImageData(snapBefore, 0, 0),
+      redo: () => ctx.putImageData(afterImage,    0, 0)
+    });
+    this.beforeImage = null;
+    }
+
+    // カーソルプレビューのクリア
+    this.cursorTools.clearRect(
+      0, 0,
+      this.cursorCanvas.width,
+      this.cursorCanvas.height
+    );
   }
 
   // クリック点を丸で埋める関数（ペン／消しゴム共用）
@@ -527,17 +619,32 @@ class History {
     }
   }
 
-  undo() {
-    if (this.pointer < 0) return;
-    this.historyStack[this.pointer].undo();
-    this.pointer--;
+undo() {
+  if (this.pointer < 0) {
+    console.warn("[Undo] 操作できる履歴がありません。pointer =", this.pointer);
+    return;
+  }else{
+    console.log("undoが実行されました.",appHistory.historyStack);
   }
+  this.historyStack[this.pointer].undo();
+  this.pointer--;
+}
 
-  redo() {
-    if (this.pointer >= this.historyStack.length - 1) return;
-    this.pointer++;
-    this.historyStack[this.pointer].redo();
+redo() {
+  if (this.pointer >= this.historyStack.length - 1) {
+    console.warn("[Redo] 戻せる操作がありません。pointer =", this.pointer);
+    return;
+  }else{
+    console.log("redoが実行されました.",appHistory.historyStack);
   }
+  this.pointer++;
+  this.historyStack[this.pointer].redo();
+}
+  reset() {
+  this.historyStack = [];
+  this.pointer = -1;
+}
+
 }
 
 
@@ -612,7 +719,17 @@ eraserIncreaseBtn.addEventListener('click', () => {
   if (isErasing) manager.getActiveLayer().tools.lineWidth = v;
 });
 
-
+//取り消し・やり直し
+undoButton.addEventListener("click", (e) => {
+  // Ctrl + Z → Undo
+    appHistory.undo();
+    e.preventDefault();  // ブラウザの元の動作（戻る）を無効化
+});
+redoButton.addEventListener("click", (e) => {
+  // Ctrl + Z → Undo
+    appHistory.redo();
+    e.preventDefault();  // ブラウザの元の動作（戻る）を無効化
+});
   </script>
 
   <script>// カラーピッカーのスクリプト。
@@ -664,17 +781,34 @@ function resizeCanvases() {
 
 <!--DOM取得に関わるコード-->
 <script>
+  appHistory = new History();
   window.addEventListener('load', () => {
   manager = new LayerManager(wrapper);
   baseLayer = manager.addLayer()
   manager.renderLayerPanel();
   resizeCanvases();
   updateBrushColor(); // カラーピッカーの初期化
+  appHistory.reset();
   manager.addLayer();
   manager.addLayer();//for test
   DM = new DrawManager(wrapper, cursorCanvas, manager);
-  history = new History();
 });
+
+// キーボードショートカットで undo / redo を実行
+window.addEventListener("keydown", e => {
+  if (e.ctrlKey && !e.shiftKey && e.key === "z") {
+    // Ctrl + Z → Undo
+    appHistory.undo();
+    e.preventDefault();  // ブラウザの元の動作（戻る）を無効化
+  }
+
+  if ((e.ctrlKey && e.key === "y") || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z")) {
+    // Ctrl + Y または Ctrl + Shift + Z → Redo
+    appHistory.redo();
+    e.preventDefault();  // ブラウザの動作（再読み込みなど）を防止
+  }
+});
+
 </script>
 </body>
 </html>
