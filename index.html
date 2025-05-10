@@ -436,85 +436,54 @@ class ToolManager {
 
     this.current = null;
     this.tools = {
-      brush: {
-        name: 'Brush',
-        isDrawing: false,          // ← 追加
-        onDown(e, { drawTools }) {
-          this.isDrawing = true;   // ← 追加
-          const p = toCanvas(e);
-          drawTools.beginPath();
-          drawTools.moveTo(p.x, p.y);
-          this.last = p;
-        },
-        onMove(e, { drawTools }) {
-          if (!this.isDrawing) return;  // ← 追加
-          const p = toCanvas(e);
-          drawTools.lineTo(p.x, p.y);
-          drawTools.stroke();
-          this.last = p;
-        },
-        onUp(e, { drawTools }) {
-          this.isDrawing = false;  // ← 追加
-          this.last = null;
-        }
-      },
+  brush: {
+    name: 'Brush',
+    size: +brushWidthSlider.value, // ← 初期サイズをセット
+    isDrawing: false,
+    onDown(e, { drawTools }) {
+      this.isDrawing = true;
+      const p = toCanvas(e);
+      drawTools.beginPath();
+      drawTools.moveTo(p.x, p.y);
+      drawTools.lineWidth = this.size; // ← 適用！
+    },
+    onMove(e, { drawTools }) {
+      if (!this.isDrawing) return;
+      const p = toCanvas(e);
+      drawTools.lineTo(p.x, p.y);
+      drawTools.stroke();
+    },
+    onUp(e) {
+      this.isDrawing = false;
+    }
+  },
 
-      eraser: {
-        name: 'Eraser',
-        isDrawing: false,          // ← 追加
-        onDown(e, { drawTools }) {
-          drawTools.save();
-          drawTools.globalCompositeOperation = 'destination-out';
-          this.tools.brush.onDown.call(this, e, { drawTools });
-        },
-        onMove(e, { drawTools }) {
-          if (!this.isDrawing) return;  // ← 追加
-          this.tools.brush.onMove.call(this, e, { drawTools });
-        },
-        onUp(e, { drawTools }) {
-          drawTools.restore();
-          this.tools.brush.onUp.call(this, e, { drawTools });
-        }
-      },
+  eraser: {
+    name: 'Eraser',
+    size: +eraserWidthSlider.value,
+    isDrawing: false,
+    onDown(e, { drawTools }) {
+      this.isDrawing = true;
+      drawTools.save();
+      drawTools.globalCompositeOperation = 'destination-out';
+      drawTools.lineWidth = this.size;
+      const p = toCanvas(e);
+      drawTools.beginPath();
+      drawTools.moveTo(p.x, p.y);
+    },
+    onMove(e, { drawTools }) {
+      if (!this.isDrawing) return;
+      const p = toCanvas(e);
+      drawTools.lineTo(p.x, p.y);
+      drawTools.stroke();
+    },
+    onUp(e, { drawTools }) {
+      this.isDrawing = false;
+      drawTools.restore();
+    }
+  }
+}
 
-      nagenawaFill: {
-        name: 'NagenawaFill',
-        isDrawing: false,          // ← 追加
-        points: [],
-        onDown(e, { previewTools }) {
-          this.isDrawing = true;   // ← 追加
-          this.points = [ toCanvas(e) ];
-          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
-        },
-        onMove(e, { previewTools }) {
-          if (!this.isDrawing) return;  // ← 追加
-          const p = toCanvas(e);
-          this.points.push(p);
-          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
-          previewTools.beginPath();
-          this.points.forEach((pt, i) => i===0
-            ? previewTools.moveTo(pt.x, pt.y)
-            : previewTools.lineTo(pt.x, pt.y)
-          );
-          previewTools.stroke();
-        },
-        onUp(e, { drawTools, previewTools }) {
-          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
-          drawTools.save();
-          drawTools.beginPath();
-          this.points.forEach((pt, i) => i===0
-            ? drawTools.moveTo(pt.x, pt.y)
-            : drawTools.lineTo(pt.x, pt.y)
-          );
-          drawTools.closePath();
-          drawTools.fillStyle = drawTools.strokeStyle;
-          drawTools.fill();
-          drawTools.restore();
-          this.points = [];
-          this.isDrawing = false;  // ← 追加
-        }
-      }
-    };
   }
 
   select(name) {
@@ -530,7 +499,8 @@ class ToolManager {
 // ───────── 初期化 ─────────
 const toolMgr = new ToolManager();
 // 最初はブラシを選択
-toolMgr.select('brush');
+toolMgr.select("brush");
+
 // ───────── CursorManager ─────────
 class CursorManager {
   constructor(wrapper, cursorCanvas, toolMgr, brushSlider, eraserSlider) {
@@ -562,10 +532,8 @@ class CursorManager {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top)  * scaleY;
 
-    // ツールに応じたサイズ取得
-    const size = this.toolMgr.current.name === 'Eraser'
-      ? +this.eraserSlider.value
-      : +this.brushSlider.value;
+const size = this.toolMgr.current.size;
+
 
     // クリアしてからリング描画
     this.tools.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -717,31 +685,42 @@ addLayerFTBtn.addEventListener("click", () => {
   console.log("add-layer-from-tags pushed!");
 });
 
-// 🎨 ペンの太さ変更
-brushWidthSlider.addEventListener('input', () => {
-  if (!isErasing) {
-    manager.getActiveLayer().tools.lineWidth = brushWidthSlider.value;
+brushWidthSlider.addEventListener("input", () => {
+  const size = +brushWidthSlider.value;
+  toolMgr.tools.brush.size = size;
+  if (toolMgr.current.name === "Brush") {
+    toolMgr.current.size = size;
   }
-  brushSizeDisplay.textContent = brushWidthSlider.value;
+  brushSizeDisplay.textContent = size;
 });
 
-// 🧽 消しゴムの太さ変更
-eraserWidthSlider.addEventListener('input', () => {
-  if (isErasing) {
-    manager.getActiveLayer().tools.lineWidth = eraserWidthSlider.value;
+eraserWidthSlider.addEventListener("input", () => {
+  const size = +eraserWidthSlider.value;
+  toolMgr.tools.eraser.size = size;
+  if (toolMgr.current.name === "Eraser") {
+    toolMgr.current.size = size;
   }
-  eraserSizeDisplay.textContent = eraserWidthSlider.value;
+  eraserSizeDisplay.textContent = size;
 });
+
+
 //消しゴムモードのスクリプト
 const modeToggle = document.getElementById('mode-toggle');
+
 modeToggle.addEventListener('click', () => {
-  isErasing = !isErasing;  // 状態を反転true or false
-  modeToggle.textContent = isErasing ? "ペンに切り替え" : "消しゴムに切り替え";
-  manager.getActiveLayer().tools.globalCompositeOperation = isErasing
-    ? 'destination-out'    // ← 消しゴム（trueのとき）
-    : 'source-over';       // ← 通常の描画（falseのとき）
-  manager.getActiveLayer().tools.lineWidth = isErasing ? eraserWidthSlider.value : brushWidthSlider.value; //モードごとにブラシサイズを定める
+  const currentTool = toolMgr.current.name;
+
+  if (currentTool === "Brush") {
+    toolMgr.select("eraser");
+    modeToggle.textContent = "ペンに切り替え";
+  } else {
+    toolMgr.select("brush");
+    modeToggle.textContent = "消しゴムに切り替え";
+  }
 });
+//初期化
+modeToggle.textContent = "消しゴムに切り替え";
+
   //ボタン
   // ブラシサイズ ±1px
 brushDecreaseBtn.addEventListener('click', () => {
