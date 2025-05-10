@@ -12,6 +12,7 @@
   9. Mode Toggle
   10. Drag-and-Drop Visuals
   11. Undo/Redo Buttons
+  12. 投げなわ塗り
   ==================================================== */
 
 @charset "UTF-8";
@@ -233,3 +234,25 @@ canvas {
   font-weight: bold;
   outline: 2px solid #000;
 }
+
+/* ───────── 投げなわ塗り ───────── */
+
+
+#nagenawafill-toggle.active {
+  background-color: #0159dd;
+  color: #fff;
+  font-weight: bold;
+  outline: 2px solid #000;
+}
+
+#nagenawafill-toggle:active {
+  background-color: #dd0101;
+  color: #fff;
+  font-weight: bold;
+  outline: 2px solid #000;
+}
+#nagenawafill-toggle .onoff {
+  font-weight: bold;
+  font-family: sans-serif;
+}
+
