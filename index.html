@@ -424,6 +424,9 @@ class DrawManager {
     this.isDrawing = false;
     this.lastX = this.lastY = 0;
 
+    // 「描画前」を保持する変数
+    this._beforeImage  = null;
+
     // イベント登録はコンストラクタで１回だけ
     wrapper.addEventListener('pointerdown',  e => this.onDown(e));
     wrapper.addEventListener('pointermove',  e => this.onMove(e));
@@ -670,6 +673,7 @@ function resizeCanvases() {
   manager.addLayer();
   manager.addLayer();//for test
   DM = new DrawManager(wrapper, cursorCanvas, manager);
+  history = new History();
 });
 </script>
 </body>
