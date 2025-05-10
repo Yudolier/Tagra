@@ -42,6 +42,7 @@
       <span id="eraser-size-display">8</span>px
     </div>
     <button id="mode-toggle">消しゴムに切り替え</button>
+    <button id="nagenawafill-toggle">投げなわ塗り：<b>OFF</b></button>
   </div>
 
   <!-- カラーピッカー&不透明度のhtml -->
@@ -253,9 +254,12 @@ class LayerManager {
   getActiveLayer() { return this.layers[this.AI] ?? null; }
   setActive(idx) {
     if (idx < 0 || idx >= this.layers.length) return;
+
     this.AI = idx;
-    updateBrushColor();
-    this.updateActiveHighlight();
+
+    updateBrushColor();             // ← カラースタイルの再適用
+    this.updateActiveHighlight();  // ← UI側の強調表示更新
+    toolMgr.applyStyleTo(this.getActiveLayer()?.ctx);  // ★ スタイル再適用
   }
 
   /* --- Z-index 再計算 ------------------------------------------- */
@@ -485,7 +489,23 @@ class ToolManager {
 }
 
   }
+  applyStyleTo(ctx) {
+      if (!ctx || !this.current) return;
 
+      const tool = this.current;
+      if (tool.name === 'Brush') {
+        ctx.lineWidth = tool.size;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalCompositeOperation = 'source-over';
+        brushWidthSlider.value = tool.size;
+      } else if (tool.name === 'Eraser') {
+        ctx.lineWidth = tool.size;
+        ctx.globalCompositeOperation = 'destination-out';
+        eraserWidthSlider.value = tool.size;
+      }
+      console.log("applyStyleToが実行されました.");
+    }
   select(name) {
     if (!this.ctx[name]) throw new Error(`ツール「${name}」が見つかりません`);
     this.current = this.ctx[name];
@@ -517,6 +537,8 @@ class CursorManager {
 
     // マウス動かすたびに描画
     wrapper.addEventListener('pointermove', e => this.draw(e));
+    wrapper.addEventListener('pointerleave', () => this.clear());
+
   }
 
   resize() {
@@ -543,6 +565,10 @@ const size = this.toolMgr.current.size;
     this.ctx.arc(x, y, size/2, 0, Math.PI*2);
     this.ctx.stroke();
   }
+  clear() {
+  this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+}
+
 }
 
 const cursorMgr    = new CursorManager(
@@ -687,18 +713,40 @@ addLayerFTBtn.addEventListener("click", () => {
 
 brushWidthSlider.addEventListener('input', () => {
   const size = +brushWidthSlider.value;
+
+  // ❶ ツールオブジェクトに反映
   toolMgr.ctx.brush.size = size;
   brushSizeDisplay.textContent = size;
+
+  // ❷ 現在のツールがブラシだったらコンテキストに即反映
+  if (toolMgr.current === toolMgr.ctx.brush) {
+    const layerCtx = manager.getActiveLayer().ctx;
+    layerCtx.lineWidth = size;
+    layerCtx.lineCap = 'round';     // ついでに保持されてないならここで設定
+    layerCtx.lineJoin = 'round';    // お好みで
+    layerCtx.globalCompositeOperation = 'source-over'; // 通常描画に戻す
+  }
 });
+
 
 eraserWidthSlider.addEventListener('input', () => {
   const size = +eraserWidthSlider.value;
+  // ❶ ツール本体のサイズ更新
   toolMgr.ctx.eraser.size = size;
   eraserSizeDisplay.textContent = size;
+
+  // ❷ 「今選択中」かつ「消しゴムモード中」なら、すぐにコンテキストにも反映
+  if (toolMgr.current === toolMgr.ctx.eraser) {
+    const layerCtx = manager.getActiveLayer().ctx;
+    layerCtx.lineWidth = size;
+    layerCtx.globalCompositeOperation = 'destination-out';
+  }
 });
 
-//消しゴムモードのスクリプト
+
+//消しゴムモードと投げ縄塗りのスクリプト
 const modeToggle = document.getElementById('mode-toggle');
+const nagenawaFill = document.getElementById('nagenawafill-toggle');
 
 modeToggle.addEventListener('click', () => {
   const currentTool = toolMgr.current.name;
@@ -711,8 +759,18 @@ modeToggle.addEventListener('click', () => {
     modeToggle.textContent = "消しゴムに切り替え";
   }
 });
-//
+//初期化
 modeToggle.textContent = "消しゴムに切り替え";
+
+//投げ縄塗りのボタン
+let nage = false;
+nagenawaFill.addEventListener('click', () => {
+  nage = !nage;
+
+  nagenawaFill.innerHTML = `投げなわ塗り：<span class="onoff">${nage ? "ON" : "OFF"}</span>`;
+  nagenawaFill.classList.toggle('active', nage);
+});
+
 
   //ボタン
   // ブラシサイズ ±1px
