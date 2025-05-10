@@ -94,171 +94,154 @@ class Layer {
     this.visible = true;
   }
 }
+/* ===================== LayerManager ===================== */
 class LayerManager {
   constructor(wrapper) {
-    this.wrapper = wrapper;
-    this.cursorCanvas = document.getElementById("cursorCanvas");
-    this.layers = [];
-    this.AI = 0;
-    this.nextId = 1;
+    this.wrapper   = wrapper;
+    this.layers    = [];
+    this.AI        = 0;   // Active Index
+    this.nextId    = 1;   // 名前の連番用
+    this._dropIndicator = null;  // ドラッグインジケータ
   }
 
-addLayer(name = `Layer ${this.nextId++}`, skipHistory = false) {
-  const layer = new Layer(name);
-  const { clientWidth: w, clientHeight: h } = this.wrapper;
+  /* --- 追加 ------------------------------------------------------- */
+  addLayer(name = `Layer ${this.nextId++}`, skipHistory = false) {
+    const layer = new Layer(name);
+    const { clientWidth: w, clientHeight: h } = this.wrapper;
 
-  layer.canvas.width = w;
-  layer.canvas.height = h;
-  layer.canvas.style.zIndex = this.layers.length + 1;
-  layer.canvas.style.position = "absolute";
-  layer.canvas.style.top = "0";
-  layer.canvas.style.left = "0";
+    layer.canvas.width  = w;
+    layer.canvas.height = h;
+    layer.canvas.style.zIndex   = this.layers.length + 1;
+    layer.canvas.style.position = "absolute";
+    layer.canvas.style.top      = "0";
+    layer.canvas.style.left     = "0";
 
-  this.wrapper.appendChild(layer.canvas);
-  applyBrushStyle(layer.tools);
+    this.wrapper.appendChild(layer.canvas);
+    applyBrushStyle(layer.tools);
 
-  this.layers.push(layer);
-  this.AI = this.layers.length - 1;
-  this.renderLayerPanel();
+    this.layers.push(layer);
+    this.AI = this.layers.length - 1;
+    this.renderLayerPanel();
 
-  // 🎯 履歴に追加（skipHistory が false のときのみ）
-  if (!skipHistory) {
-    const layerIndex = this.layers.length - 1;
-    appHistory.push({
-      undo: () => {
-        this.removeLayer(layerIndex, true); // 削除時も履歴に追加しない
-      },
-      redo: () => {
-        this.addLayer(name, true);         // 再追加（同じ名前、履歴は追加しない）
-      }
-    });
-  }
-
-  return layer;
-}
-
-
-  getActiveLayer() {
-    return this.layers[this.AI] ?? null;
-  }
-
-setActive(index) {
-  if (index >= 0 && index < this.layers.length) {
-    const previousLayer = this.getActiveLayer();  // ←今のアクティブレイヤーを保持
-    this.AI = index;
-
-    updateBrushColor();
-    this.updateActiveHighlight();
-    //this.renderLayerPanel();
-    //console.log("setActiveが実行されました.");
-    console.log("アクティブなレイヤー：layers[",this.AI,"]");
-    //console.log("tools is", manager.getActiveLayer().tools);
-    //console.log("canvas is", manager.getActiveLayer().canvas);
-    console.log(this.layers);
-  } else {
-    alert("エラー：無効な値です。");
-  }
-}
-
-removeLayer(index, skipHistory = false) {
-  if (this.layers.length <= 1) {
-    alert("エラー：レイヤーを0枚にすることはできません。");
-    return false;
-  }
-
-  const layer = this.layers[index];
-  if (!layer) return false;
-
-  // --- Undo用スナップショットを作成 ---
-  const snapshot = {
-    name: layer.name,
-    visible: layer.visible,
-    imageData: layer.tools.getImageData(0, 0, layer.canvas.width, layer.canvas.height),
-    index: index
-  };
-
-  // --- 履歴にpush ---
-if (!skipHistory) {
-  appHistory.push({
-    undo: () => {
-      const newLayer = new Layer(snapshot.name);
-      newLayer.visible = snapshot.visible;
-
-      newLayer.canvas.width  = snapshot.imageData.width;
-      newLayer.canvas.height = snapshot.imageData.height;
-      newLayer.canvas.style.position = "absolute";
-      newLayer.canvas.style.top = "0";
-      newLayer.canvas.style.left = "0";
-
-      newLayer.tools.putImageData(snapshot.imageData, 0, 0);
-
-      this.layers.splice(snapshot.index, 0, newLayer);
-      this.wrapper.appendChild(newLayer.canvas);
-      this.renderZIndex();
-      this.AI = snapshot.index;
-      this.renderLayerPanel();
-    },
-    redo: () => {
-      this.removeLayer(snapshot.index, true); // ← push させない
+    if (!skipHistory) {
+      const idx = this.layers.length - 1;
+      appHistory.push({
+        undo: () => this.removeLayer(idx, true),
+        redo: () => this.addLayer(name, true),
+      });
     }
-  });
-}
-
-
-  // --- キャンバス削除 & 配列から除外 ---
-  this.wrapper.removeChild(layer.canvas);
-  this.layers.splice(index, 1);
-
-  // --- AI補正 ---
-  if (index < this.AI) {
-    this.AI -= 1;
-  } else if (index === this.AI) {
-    this.AI = Math.min(this.AI, this.layers.length - 1);
+    return layer;
   }
 
-  this.renderLayerPanel();
-  return true;
-}
-
-
-
-  renameLayer(index, newName) {
+  /* --- 削除 ------------------------------------------------------- */
+  removeLayer(index, skipHistory = false) {
+    if (this.layers.length <= 1) {
+      alert("エラー：レイヤーを0枚にすることはできません。");
+      return false;
+    }
     const layer = this.layers[index];
-    if (layer) {
-      layer.name = newName;
-      this.renderLayerPanel();
+    if (!layer) return false;
+
+    const snapshot = {
+      name      : layer.name,
+      visible   : layer.visible,
+      imageData : layer.tools.getImageData(0, 0, layer.canvas.width, layer.canvas.height),
+      index,
+    };
+
+    if (!skipHistory) {
+      appHistory.push({
+        undo: () => {
+          const l = new Layer(snapshot.name);
+          l.visible = snapshot.visible;
+          l.canvas.width  = snapshot.imageData.width;
+          l.canvas.height = snapshot.imageData.height;
+          l.canvas.style.position = "absolute";
+          l.canvas.style.top = l.canvas.style.left = "0";
+          l.tools.putImageData(snapshot.imageData, 0, 0);
+          this.layers.splice(snapshot.index, 0, l);
+          this.wrapper.appendChild(l.canvas);
+          this.renderZIndex();
+          this.AI = snapshot.index;
+          this.renderLayerPanel();
+        },
+        redo: () => this.removeLayer(snapshot.index, true),
+      });
+    }
+
+    this.wrapper.removeChild(layer.canvas);
+    this.layers.splice(index, 1);
+    if (index <= this.AI) this.AI = Math.max(0, this.AI - 1);
+    this.renderLayerPanel();
+    return true;
+  }
+
+  /* --- 名前変更 --------------------------------------------------- */
+  renameLayer(index, newName, skipHistory = false) {
+    const layer = this.layers[index];
+    if (!layer || layer.name === newName) return;
+    const oldName = layer.name;
+    layer.name = newName;
+    this.renderLayerPanel();
+
+    if (!skipHistory) {
+      appHistory.push({
+        undo: () => this.renameLayer(index, oldName, true),
+        redo: () => this.renameLayer(index, newName, true),
+      });
     }
   }
 
+  /* --- 並べ替え（履歴対応） ------------------------------------- */
+  reorderLayer(oldIdx, newIdx, skipHistory = false) {
+    if (oldIdx === newIdx) return;
+    const layer = this.layers[oldIdx];
+    if (!layer) return;
+
+    if (!skipHistory) {
+      appHistory.push({
+        undo: () => this.reorderLayer(newIdx, oldIdx, true),
+        redo: () => this.reorderLayer(oldIdx, newIdx, true),
+      });
+    }
+
+    this.layers.splice(oldIdx, 1);
+    this.layers.splice(newIdx, 0, layer);
+
+    this.AI = this.layers.indexOf(layer);
+    this.renderZIndex();
+    this.renderLayerPanel();
+  }
+
+  /* --- 上下移動（ボタン用） ------------------------------------- */
+  moveLayer(index, direction, skipHistory = false) {
+    const target = direction === "up" ? index + 1 : index - 1;
+    if (target < 0 || target >= this.layers.length) return;
+    this.reorderLayer(index, target, skipHistory);
+  }
+
+  /* --- 可視/不可視 ------------------------------------------------ */
   toggleVisibility(index) {
     const layer = this.layers[index];
-    if (layer) {
-      layer.visible = !layer.visible;
-      layer.canvas.style.display = layer.visible ? "block" : "none";
-    }
+    if (!layer) return;
+    layer.visible = !layer.visible;
+    layer.canvas.style.display = layer.visible ? "block" : "none";
   }
 
+  /* --- 複製 ------------------------------------------------------- */
   duplicateLayer(index) {
     const original = this.layers[index];
-    if (!original) {
-    alert(`指定されたレイヤー（index: ${index}）が見つかりませんでした。複製できません。`);
-    console.error(`duplicateLayer: index ${index} が無効です。layers.length = ${this.layers.length}`);
-    return null;
-  }
+    if (!original) return null;
 
     const newLayer = new Layer(`${original.name} copy`);
-    newLayer.canvas.width = original.canvas.width;
+    newLayer.canvas.width  = original.canvas.width;
     newLayer.canvas.height = original.canvas.height;
     newLayer.tools.drawImage(original.canvas, 0, 0);
-
-    newLayer.canvas.style.zIndex = this.layers.length + 1;
     newLayer.canvas.style.position = "absolute";
-    newLayer.canvas.style.top = "0";
-    newLayer.canvas.style.left = "0";
+    newLayer.canvas.style.top = newLayer.canvas.style.left = "0";
+    newLayer.canvas.style.zIndex = this.layers.length + 1;
     this.wrapper.appendChild(newLayer.canvas);
-
     applyBrushStyle(newLayer.tools);
-
 
     this.layers.push(newLayer);
     this.AI = this.layers.length - 1;
@@ -266,208 +249,159 @@ if (!skipHistory) {
     return newLayer;
   }
 
-  moveLayer(index, direction) {
-    const swapWith = direction === "up" ? index + 1 : index - 1;
-    if (swapWith < 0 || swapWith >= this.layers.length) return;
-
-    [this.layers[index], this.layers[swapWith]] = [this.layers[swapWith], this.layers[index]];
-    this.renderZIndex();
-    this.AI = swapWith;
-    this.renderLayerPanel();
+  /* --- アクティブ ------------------------------------------------- */
+  getActiveLayer() { return this.layers[this.AI] ?? null; }
+  setActive(idx) {
+    if (idx < 0 || idx >= this.layers.length) return;
+    this.AI = idx;
+    updateBrushColor();
+    this.updateActiveHighlight();
   }
-//各レイヤーの z-index を、配列の順番に応じて整理し直す関数(並び替えたあとに呼ぶ)
+
+  /* --- Z-index 再計算 ------------------------------------------- */
   renderZIndex() {
-    this.layers.forEach((layer, i) => {
-      layer.canvas.style.zIndex = i + 1;
-    });
+    this.layers.forEach((l, i) => { l.canvas.style.zIndex = i + 1; });
   }
 
-//layersをmapで以下のオブジェクトの配列に変換（いちいちpushをループしなくてもいい）
+  /* --- レイヤー一覧取得（任意利用） ------------------------------ */
   getLayerList() {
-    return this.layers.map((layer, index) => ({
-      index,
-      name: layer.name,
-      visible: layer.visible ?? true,
-      active: index === this.AI,
+    return this.layers.map((l, i) => ({
+      index  : i,
+      name   : l.name,
+      visible: l.visible ?? true,
+      active : i === this.AI,
     }));
   }
-// --- レイヤーパネル再生成 ---
-renderLayerPanel() {
-  const panel = document.getElementById("layer-panel");
-  panel.innerHTML = "";
 
-  // --- ドロップインジケータを初回生成 ---
-  if (!this._dropIndicator) {
-    const di = document.createElement("div");
-    di.className = "drop-indicator";
-    di.style.display = "none";
-    panel.appendChild(di);
-    this._dropIndicator = di;
-  }
-  const dropIndicator = this._dropIndicator;
-  let draggedLayerIndex = null;
+  /* --- パネル再描画＋DnD ---------------------------------------- */
+  renderLayerPanel() {
+    const panel = document.getElementById("layer-panel");
+    panel.innerHTML = "";
 
-  // --- 各レイヤー行を生成 ---
-  this.layers.forEach((layer, idx) => {
-    const item = document.createElement("div");
-    // --- 行本体 ---
-    item.className = "layer-item";
-    item.dataset.index = idx;
+    // ドロップインジケータ（初回のみ生成）
+    if (!this._dropIndicator) {
+      const di = document.createElement("div");
+      di.className = "drop-indicator";
+      di.style.display = "none";
+      panel.appendChild(di);
+      this._dropIndicator = di;
+    }
+    const dropIndicator = this._dropIndicator;
+    let draggedIdx = null;
 
-    if (idx === this.AI) item.classList.add("active-layer");
-    item.setAttribute("draggable", true);
+    /* ---------- 1. 行生成 ---------- */
+    this.layers.forEach((layer, idx) => {
+      const item = document.createElement("div");
+      item.className   = "layer-item";
+      item.dataset.index = idx;
+      if (idx === this.AI) item.classList.add("active-layer");
+      item.setAttribute("draggable", true);
 
-    // --- レイヤー名 ---
-    const nameSpan = document.createElement("span");
-    nameSpan.className = "layer-name";
-    nameSpan.textContent = layer.name;
-    nameSpan.setAttribute("draggable", false);
-    // ダブルクリックでリネーム
-    nameSpan.addEventListener("dblclick", e => {
-      e.stopPropagation();
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = layer.name;
-      input.className = "rename-input";
-      const finish = ok => {
-        if (ok) this.renameLayer(idx, input.value.trim() || layer.name);
-        else    this.renderLayerPanel();
-      };
-      input.addEventListener("keydown", ev => {
-        if (ev.key === "Enter")  finish(true);
-        if (ev.key === "Escape") finish(false);
+      // 名前
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "layer-name";
+      nameSpan.textContent = layer.name;
+      nameSpan.setAttribute("draggable", false);
+      nameSpan.addEventListener("dblclick", e => {
+        e.stopPropagation();
+        const input = document.createElement("input");
+        input.type = "text";
+        input.value = layer.name;
+        input.className = "rename-input";
+        const finish = ok => {
+          if (ok) this.renameLayer(idx, input.value.trim() || layer.name);
+          else    this.renderLayerPanel();
+        };
+        input.addEventListener("keydown", ev => {
+          if (ev.key === "Enter")  finish(true);
+          if (ev.key === "Escape") finish(false);
+        });
+        input.addEventListener("blur", () => finish(true));
+        nameSpan.replaceWith(input);
+        input.focus(); input.select();
       });
-      input.addEventListener("blur", () => finish(true));
-      nameSpan.replaceWith(input);
-      input.focus(); input.select();
+
+      // 選択
+      item.addEventListener("click", () => { this.setActive(idx); });
+
+      // 削除ボタン
+      const del = document.createElement("button");
+      del.className = "delete-button";
+      del.textContent = "✕";
+      del.setAttribute("draggable", false);
+      del.addEventListener("click", e => {
+        e.stopPropagation();
+        this.removeLayer(idx);
+      });
+
+      // ドラッグ開始／終了
+      item.addEventListener("dragstart", e => {
+        draggedIdx = idx;
+        item.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", ""); // for Firefox
+      });
+      item.addEventListener("dragend", () => {
+        item.classList.remove("dragging");
+        dropIndicator.style.display = "none";
+      });
+
+      // 逆順表示
+      item.appendChild(nameSpan);
+      item.appendChild(del);
+      panel.prepend(item);
     });
 
-    // --- クリックで選択（ハイライトのみ） ---
-    item.addEventListener("click", () => {
-      this.setActive(idx);
-      this.updateActiveHighlight();
+    /* ---------- 2. ドラッグオーバー ---------- */
+    panel.addEventListener("dragover", e => {
+      e.preventDefault();
+      if (draggedIdx == null) return;
+
+      const tgt = e.target.closest(".layer-item");
+      if (!tgt) return;
+
+      const rect = tgt.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+
+      dropIndicator.style.display = "block";
+      panel.insertBefore(dropIndicator, before ? tgt : tgt.nextSibling);
+
+      const rows = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
+      const vis  = rows.indexOf(dropIndicator);
+      let logical = this.layers.length - 1 - vis;
+      if (logical > draggedIdx) logical -= 1;
+      dropIndicator.classList.toggle("below", logical > draggedIdx);
     });
 
-    // --- 削除ボタン ---
-    const delBtn = document.createElement("button");
-    delBtn.className = "delete-button";
-    delBtn.textContent = "✕";
-    delBtn.setAttribute("draggable", false);
-    delBtn.addEventListener("click", e => {
-      e.stopPropagation();
-      this.removeLayer(idx);
-    });
+    /* ---------- 3. ドロップ ---------- */
+    panel.addEventListener("drop", e => {
+      e.preventDefault();
+      if (draggedIdx == null) return;
 
-    // --- ドラッグ開始／終了 ---
-    item.addEventListener("dragstart", e => {
-      draggedLayerIndex = idx;
-      item.classList.add("dragging");
-      e.dataTransfer.effectAllowed = "move";
-      e.dataTransfer.setData("text/plain", "");
-    });
-    item.addEventListener("dragend", () => {
-      item.classList.remove("dragging");
+      const rows = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
+      const vis  = rows.indexOf(dropIndicator);
+      let target = this.layers.length - 1 - vis;
+      target = Math.min(Math.max(target, 0), this.layers.length - 1);
+
+      this.reorderLayer(draggedIdx, target);
+      draggedIdx = null;
       dropIndicator.style.display = "none";
     });
 
-    // --- DOMへ配置（逆順表示） ---
-    item.appendChild(nameSpan);
-    item.appendChild(delBtn);
-    panel.prepend(item);
-  });
-
-  // --- パネル全体で dragover/drop を処理 ---
-panel.addEventListener("dragover", e => {
-  e.preventDefault();
-  if (draggedLayerIndex == null) return;
-
-  const tgt = e.target.closest(".layer-item");
-  if (!tgt) return;
-
-  /* --- ① 行の中心線で上/下を判定 ----------------------- */
-  const rect       = tgt.getBoundingClientRect();
-  const insertBefore = e.clientY < rect.top + rect.height / 2;
-
-  /* --- ② プレビューを挿入 ------------------------------ */
-  dropIndicator.style.display = "block";
-  panel.insertBefore(dropIndicator,
-    insertBefore ? tgt : tgt.nextSibling
-  );
-
-  /* --- ③ 実際の挿入 index を計算（下方向は -1 補正） --- */
-  const rows   = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
-  let visIdx   = rows.indexOf(dropIndicator);
-  let target   = this.layers.length - 1 - visIdx;
-  if (target > draggedLayerIndex) target -= 1;
-
-  /* --- ④ 矢印向きを移動方向で切替 --------------------- */
-  dropIndicator.classList.toggle("below", target > draggedLayerIndex);
-});
-
-
-panel.addEventListener("drop", e => {
-  e.preventDefault();
-
-  if (draggedLayerIndex == null) return;
-
-  // --- 1. インジケータの位置から表示上の行番号を取得 ---
-  const visualRowList = Array.from(panel.querySelectorAll(".layer-item, .drop-indicator"));
-  const visualDropIndex = visualRowList.indexOf(dropIndicator);
-
-  // --- 2. 表示順 → 論理順に変換（prepend表示なので逆順） ---
-  let targetLayerIndex = this.layers.length - 1 - visualDropIndex;
-
-  // --- 3. 範囲を強制的に補正（0 ～ layers.length-1） ---
-  targetLayerIndex = Math.min(Math.max(targetLayerIndex, 0), this.layers.length - 1);
-
-  // --- 4. 同じ場所なら何もしない ---
-  if (targetLayerIndex === draggedLayerIndex) {
-    draggedLayerIndex = null;
-    dropIndicator.style.display = "none";
-    return;
+    this.updateActiveHighlight();
   }
 
-// --- 5. movedLayer を抜いたあと、挿入位置を決定 ---
-const movedLayer = this.layers.splice(draggedLayerIndex, 1)[0];
-
-let insertionIndex = targetLayerIndex;
-if (insertionIndex > draggedLayerIndex) {
-  // 下方向の場合、配列は 1 つ短くなっているので -1 する
-  //insertionIndex -= 1;
+  /* --- アクティブ行のハイライト更新 ----------------------------- */
+  updateActiveHighlight() {
+    const items = document.querySelectorAll("#layer-panel .layer-item");
+    const n = this.layers.length;
+    items.forEach((row, i) => {
+      const logicalIdx = n - 1 - i; // prepend 表示なので反転
+      row.classList.toggle("active-layer", logicalIdx === this.AI);
+    });
+  }
 }
-
-// ★★ ここで実際に挿入 ★★
-this.layers.splice(insertionIndex, 0, movedLayer);
-
-// --- 6. AI（アクティブレイヤ）を new 配列上の正しい位置に ---
-this.AI = this.layers.indexOf(movedLayer);
-
-  // --- 7. Z-indexを更新して表示順を正す ---
-  this.renderZIndex();
-
-  // --- 8. パネルを再描画 ---
-  this.renderLayerPanel();
-
-  // --- 9. 後始末 ---
-  draggedLayerIndex = null;
-  dropIndicator.style.display = "none";
-});
-
-}
-
-
-updateActiveHighlight() {
-  const items = document.querySelectorAll("#layer-panel .layer-item");
-  const n = this.layers.length;
-  items.forEach((row, i) => {
-    // 見た目 i=0 が layers[n-1] に対応する
-    const correspondingIndex = n - 1 - i;
-    row.classList.toggle("active-layer", correspondingIndex === this.AI);
-  });
-}
-
-
-}
+/* =================== /LayerManager ====================== */
 
 class DrawManager {
   constructor(wrapper, cursorCanvas, layerManager) {
