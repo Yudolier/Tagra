@@ -421,6 +421,108 @@ class LayerManager {
   }
 }
 /* =================== /LayerManager ====================== */
+// ───────── ToolManager（筆箱） ─────────
+class ToolManager {
+  constructor() {
+    // canvas → レイヤー上の座標変換関数
+    const toCanvas = e => {
+      const rect = wrapper.getBoundingClientRect();
+      const scaleX = wrapper.clientWidth  / rect.width;
+      const scaleY = wrapper.clientHeight / rect.height;
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top)  * scaleY
+      };
+    };
+
+    this.current = null;  // 現在の道具
+    // 筆箱の中身をここで全部定義
+    this.tools = {
+      brush: {
+        name: 'Brush',
+        onDown(e, { drawTools }) {
+          const p = toCanvas(e);
+          drawTools.beginPath();
+          drawTools.moveTo(p.x, p.y);
+          this.last = p;
+        },
+        onMove(e, { drawTools }) {
+          const p = toCanvas(e);
+          drawTools.lineTo(p.x, p.y);
+          drawTools.stroke();
+          this.last = p;
+        },
+        onUp() {
+          this.last = null;
+        }
+      },
+      eraser: {
+        name: 'Eraser',
+        onDown(e, { drawTools }) {
+          drawTools.save();
+          drawTools.globalCompositeOperation = 'destination-out';
+          this.tools.brush.onDown.call(this, e, { drawTools });
+        },
+        onMove(e, { drawTools }) {
+          this.tools.brush.onMove.call(this, e, { drawTools });
+        },
+        onUp(e, { drawTools }) {
+          drawTools.restore();
+          this.tools.brush.onUp.call(this, e, { drawTools });
+        }
+      },
+      nagenawaFill: {
+        name: 'NagenawaFill',
+        points: [],
+        onDown(e, { previewTools }) {
+          this.points = [ toCanvas(e) ];
+          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
+        },
+        onMove(e, { previewTools }) {
+          const p = toCanvas(e);
+          this.points.push(p);
+          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
+          previewTools.beginPath();
+          this.points.forEach((pt, i) => i===0
+            ? previewTools.moveTo(pt.x, pt.y)
+            : previewTools.lineTo(pt.x, pt.y)
+          );
+          previewTools.stroke();
+        },
+        onUp(e, { drawTools, previewTools }) {
+          previewTools.clearRect(0, 0, previewTools.canvas.width, previewTools.canvas.height);
+          drawTools.save();
+          drawTools.beginPath();
+          this.points.forEach((pt, i) => i===0
+            ? drawTools.moveTo(pt.x, pt.y)
+            : drawTools.lineTo(pt.x, pt.y)
+          );
+          drawTools.closePath();
+          drawTools.fillStyle = drawTools.strokeStyle;
+          drawTools.fill();
+          drawTools.restore();
+          this.points = [];
+        }
+      }
+    };
+  }
+
+  // 道具を選ぶ
+  select(name) {
+    if (!this.tools[name]) throw new Error(`ツール「${name}」が見つかりません`);
+    this.current = this.tools[name];
+  }
+
+  // イベントを丸投げ
+  onDown(e, ctxs) { this.current?.onDown?.(e, ctxs); }
+  onMove(e, ctxs) { this.current?.onMove?.(e, ctxs); }
+  onUp(e,   ctxs) { this.current?.onUp?.(e,   ctxs); }
+}
+
+// ───────── 初期化 ─────────
+const toolMgr = new ToolManager();
+// 最初はブラシを選択
+toolMgr.select('brush');
 
 class DrawManager {
   constructor(wrapper, cursorCanvas, layerManager) {
@@ -435,11 +537,26 @@ class DrawManager {
     // 「描画前」を保持する変数
     this._beforeImage  = null;
 
-    // イベント登録はコンストラクタで１回だけ
-    wrapper.addEventListener('pointerdown',  e => this.onDown(e));
-    wrapper.addEventListener('pointermove',  e => this.onMove(e));
-    wrapper.addEventListener('pointerup',    e => this.onUp(e));
-    wrapper.addEventListener('pointerleave', e => this.onUp(e));
+    //ToolManager仕様に変更
+wrapper.addEventListener('pointerdown', e =>
+  toolMgr.onDown(e, {
+    drawTools:    manager.getActiveLayer().tools,
+    previewTools: cursorTools
+  })
+);
+wrapper.addEventListener('pointermove', e =>
+  toolMgr.onMove(e, {
+    drawTools:    manager.getActiveLayer().tools,
+    previewTools: cursorTools
+  })
+);
+wrapper.addEventListener('pointerup', e =>
+  toolMgr.onUp(e, {
+    drawTools:    manager.getActiveLayer().tools,
+    previewTools: cursorTools
+  })
+);
+
   }
 
   //座標を wrapper → アクティブキャンバス座標へ変換
