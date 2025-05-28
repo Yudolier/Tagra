@@ -29,6 +29,9 @@ JavaScriptで開発を進めており、従来のレイヤー機能を拡張し�
 - タグの階層関係に基づいた自動フォルダ整理機能
 - Pythonを用いた機械学習による筆圧キャリブレーション
 
+## 完成イメージ
+![TaGra UI Concept](/images/tagra_image.png)
+
 # TaGra - A Next-Generation Painting Software with Tag-Based Layer Management
 
 ## Overview
