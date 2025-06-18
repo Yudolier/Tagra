@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>TaGra</title>
-  <link rel="stylesheet" href="mini_base.css">
+  <link rel="stylesheet" href="base.css">
 </head>
 <body>
   <p id="title">TaGra</p>
@@ -352,10 +352,17 @@ class LayerManager {
     }
   };
 
-  input.addEventListener("keydown", ev => {
-    if (ev.key === "Enter")  { confirmed = true; finish(true); }
-    if (ev.key === "Escape") { confirmed = false; finish(false); }
-  });
+input.addEventListener("keydown", ev => {
+  if (ev.key === "Enter" && !ev.isComposing) {
+    confirmed = true;
+    finish(true);
+  }
+  if (ev.key === "Escape") {
+    confirmed = false;
+    finish(false);
+  }
+});
+
 
   input.addEventListener("blur", () => {
     if (confirmed) return; // Enterで確定済なら何もしない

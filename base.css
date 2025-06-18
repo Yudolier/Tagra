@@ -63,6 +63,21 @@ canvas{outline:1px solid #000;display:block;margin:10px auto;cursor:none;touch-a
 }
 .layer-item:hover{background:#919191;color:#fff;}
 .layer-item.active-layer{background:#0159dd;color:#fff;font-weight:bold;}
+.layer-name {
+  font-size: 16px;
+  display: block;
+  max-width: 160px;
+  overflow-x: auto;
+  white-space: nowrap;
+
+  /* スクロールバー非表示 */
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* Internet Explorer / Edge */
+}
+.layer-name::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari */
+}
+
 
 /***** 6. Rename Input *****/
 .rename-input{
