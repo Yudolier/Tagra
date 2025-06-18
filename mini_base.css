@@ -1,5 +1,5 @@
 /* =====================================================
-  TaGra-mini CSS Structure
+  TaGra-mini CSS  —  Refactored
   -----------------------------------------------------
   1. Base Reset & Typography
   2. Canvas & Drawing Area
@@ -7,345 +7,115 @@
   4. Color & Eraser Controls
   5. Layer Panel & Items
   6. Rename Input
-  7. Add Layer Buttons
-  8. Delete Button
-  9. Mode Toggle
-  10. Drag-and-Drop Visuals
-  11. Undo/Redo Buttons
-  12. 投げなわ塗り
-  13. toggle visiblity
-  14. レイヤー検索窓
-  ==================================================== */
+  7. Layer-related Buttons
+  8. Delete / Visibility Buttons
+  9. Mode & Nagenawa Toggles
+ 10. Drag-and-Drop Visuals
+ 11. Undo/Redo Buttons
+ 12. Search Window & Results
+===================================================== */
 
+/***** 1. Base Reset & Typography *****/
 @charset "UTF-8";
-/* ───────── Base Reset & Typography ───────── */
-* {
-  margin: 0;
-  padding: 0;
-  border-width: 0;
-  text-decoration: none;
-  font-size: 20px;
-  box-sizing: border-box;
+*,
+*::before,
+*::after{
+  margin:0;
+  padding:0;
+  border-width:0;
+  box-sizing:border-box;
 }
-hr {
-  border: none;
-  border-top: 2px dotted #000;
-  margin: 1em 0;
+html{font-size:20px;}
+hr{border:none;border-top:2px dotted #000;margin:1em 0;}
+#title{font:bolder 24px "Arial Black";background:#f0f0f0;outline:2px solid #000;}
+
+/***** 2. Canvas & Drawing Area *****/
+canvas{outline:1px solid #000;display:block;margin:10px auto;cursor:none;touch-action:none;}
+#canvas-wrapper{position:relative;width:100%;height:100%;}
+#canvas-wrapper canvas,#canvas-layers canvas{position:absolute;inset:0;width:100%;height:100%;}
+#cursorCanvas{position:absolute;inset:0;z-index:9999;pointer-events:none;}
+#container{position:relative;width:600px;height:400px;margin:20px auto;}
+
+/***** 3. Workspace Layout *****/
+#workspace{display:flex;height:100%;}
+#canvas-container{flex:1;display:flex;flex-direction:column;}
+
+/***** 4. Color & Eraser Controls *****/
+#color-block{display:flex;background:#fff;}
+#color-picker{width:50px;height:50px;cursor:pointer;background:#fff;}
+#eraser-block{display:flex;gap:30px;}
+
+/***** 5. Layer Panel & Items *****/
+#layer-container{
+  width:250px;max-width:300px;max-height:450px;
+  background:#f0f0f0;border:2px solid #000;
+  display:flex;flex-direction:column;overflow:hidden; /* 共通設定を一本化 */
 }
-#title {
-  font: bolder 24px "Arial Black";
-  background-color: #f0f0f0;
-  outline: 2px solid black;
+#layer-container button{font-size:15px;}
+
+#layer-panel{
+  flex:1 1 auto;overflow-y:auto;overflow-x:hidden;
+  background:#f0f0f0;padding:0;scrollbar-gutter:stable;
+}
+.layer-item{
+  display:flex;align-items:center;justify-content:space-between;
+  height:32px;padding:0 4px;border:1px solid #000;cursor:pointer;user-select:none;
+}
+.layer-item:hover{background:#919191;color:#fff;}
+.layer-item.active-layer{background:#0159dd;color:#fff;font-weight:bold;}
+
+/***** 6. Rename Input *****/
+.rename-input{
+  flex:1;min-width:0;width:80%;font-size:18px;padding:2px 4px;
+  background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 
-/* ───────── Canvas & Drawing Area ───────── */
-canvas {
-  outline: 1px solid #000;
-  display: block;
-  margin: 10px auto;
-  cursor: none;
-  touch-action: none;
-}
-#canvas-wrapper {
-  position: relative; /* これがレイヤー分けに重要 */
-  width: 100%;
-  height: 100%;
-}
-#canvas-wrapper canvas,
-#canvas-layers canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-#cursorCanvas {
-  position: absolute;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-}
-#container {
-  position: relative;
-  width: 600px;
-  height: 400px;
-  margin: 20px auto;
-}
+/***** 7. Layer-related Buttons (Add etc.) *****/
+#layer-container-buttons{display:flex;flex-direction:column;width:100%;cursor:pointer;}
+#layer-container-buttons button{border:1px solid #000;}
+#layer-container-buttons button:hover{background:#919191;color:#fff;}
 
-/* ───────── Workspace Layout ───────── */
-#workspace {
-  display: flex;
-  flex-direction: row;
-  height: 100%;
+/***** 8. Delete / Visibility Buttons *****/
+.delete-button{
+  width:24px;height:24px;line-height:24px;font-size:15px;margin-left:4px;
+  background:#b40000;color:#fff;border-radius:4px;cursor:pointer;text-align:center;
 }
-#canvas-container {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+.delete-button:hover{width:28px;height:28px;line-height:28px;font-size:20px;background:#ff0000;outline:2px solid #000;}
+.delete-button:active{background:#fff;outline:2px solid #000;}
 
-/* ───────── Color & Eraser Controls ───────── */
-#color-block {
-  display: flex;
-  background-color: #fff;
-}
-#color-picker {
-  width: 50px;
-  height: 50px;
-  border: none;
-  cursor: pointer;
-  background-color: #fff;
-}
-#eraser-block {
-  display: flex;
-  gap: 30px;
-}
+.visibility-button{font-size:.9em;background:transparent;border:none;cursor:pointer;margin-left:auto;}
 
-/* ───────── Layer Panel & Items ───────── */
-#layer-container {
-  max-width: 250px;
-  max-height: 450px;
-  background-color: #f0f0f0;
-  border: 2px solid #000;
-}
-#layer-container button{
-  font-size: 15px;
-}
-#layer-panel {
-  flex: 1;
-  height: 200px;
-  overflow-y: auto;
-  background-color: #f0f0f0;
-  border-left: 1px solid #ccc;
-  padding: 10px;
-  scrollbar-gutter: stable;
-}
-.layer-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 5px;
-  border: 1px solid #000;
-  cursor: pointer;
-  user-select: none;
-  height: 32px;
-}
-.layer-item:hover {
-  background-color: #919191;
-  color: #fff;
-}
-.layer-item.active-layer {
-  background-color: #0159dd;
-  color: #fff;
-  font-weight: bold;
-}
+/***** 9. Mode & Nagenawa Toggles *****/
+#mode-toggle:hover,#undo-button:hover,#redo-button:hover{background:#0159dd;color:#fff;font-weight:bold;outline:2px solid #000;}
+#mode-toggle:active,#undo-button:active,#redo-button:active{background:#dd0101;color:#fff;font-weight:bold;outline:2px solid #000;}
 
-/* ───────── Rename Input ───────── */
-.rename-input {
-  flex: 1 1 auto;
-  min-width: 0;
-  width: 80%;
-  font-size: 18px;
-  padding: 2px 4px;
-  background-color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-sizing: border-box;
-}
+#nagenawafill-toggle.active{
+  background:#0159dd;color:#fff;font-weight:bold;outline:2px solid #000;}
+#nagenawafill-toggle:active{background:#dd0101;color:#fff;font-weight:bold;outline:2px solid #000;}
+#nagenawafill-toggle .onoff{font-weight:bold;font-family:sans-serif;}
 
-/* ───────── Add Layer Buttons ───────── */
-#layer-container-buttons{
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  background-color: #f0f0f0;
-  cursor: pointer;
-}
-#layer-container-buttons button{
-  border:1px solid black;
-}
-#layer-container-buttons button:hover {
-  background-color: #919191;
-  color: #fff;
-}
+/***** 10. Drag-and-Drop Visuals *****/
+.layer-item.dragging{opacity:.5;}
+.drop-indicator{height:0;border-top:5px solid #ff008c;margin:0 4px;}
+.drag-placeholder{height:32px;background:rgba(56,168,255,.15);border:1px dashed #38a;margin:4px 0;}
 
-/* ───────── Delete Button ───────── */
-.delete-button {
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
-  font-size: 15px;
-  background-color: rgb(180, 0, 0);
-  color: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-left: 4px;
-  text-align: center;
-}
-.delete-button:hover {
-  width: 28px;
-  height: 28px;
-  line-height: 28px;
-  font-size: 20px;
-  background-color: rgb(255, 0, 0);
-  outline: 2px solid #000;
-}
-.delete-button:active {
-  background-color: #fff;
-  outline: 2px solid #000;
-}
+/***** 11. Undo/Redo Buttons *****/
+/* hover/active は 9 でまとめ済み */
 
-/* ───────── Mode Toggle ───────── */
-#mode-toggle:hover {
-  background-color: #0159dd;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
+/***** 12. Search Window & Results *****/
+#layer-search-wrapper{
+  border:2px solid #000;display:flex;align-items:center;gap:4px;margin-bottom:4px;padding:2px;background:#eee;
 }
-#mode-toggle:active {
-  background-color: #dd0101;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
+#layer-search{flex:1;font-size:15px;padding:4px;border:none;}
+#layer-search-clear{padding:2px 6px;font-size:.9em;cursor:pointer;background:transparent;border:none;}
+.dimmed{opacity:.5;}
+
+#search-results-panel{
+  flex:0 0 150px;overflow-y:auto;overflow-x:hidden;
+  background:#f0f0f0;border:0px solid #000;padding:4px;margin-top:4px;
 }
-
-/* ───────── Drag-and-Drop Visuals ───────── */
-.layer-item.dragging { opacity: 0.5; }
-.layer-item.drag-over { border: none;}
-.drop-indicator {
-  height: 0;
-  border-top: 5px solid rgb(255, 0, 140);
-  margin: 0 4px;
+.search-result-item{
+  font-size:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;
+  padding:4px 6px;margin-bottom:2px;background:#fff;border:1px solid transparent;
 }
-.drag-placeholder {
-  height: 32px;
-  background: rgba(56, 168, 255, 0.15);
-  border: 1px dashed #38a;
-  box-sizing: border-box;
-  margin: 4px 0;
-}
-
-/* ───────── Undo/Redo Buttons ───────── */
-#undo-button:hover,
-#redo-button:hover {
-  background-color: #0159dd;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
-}
-#undo-button:active,
-#redo-button:active {
-  background-color: #dd0101;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
-}
-
-/* ───────── 投げなわ塗り ───────── */
-
-
-#nagenawafill-toggle.active {
-  background-color: #0159dd;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
-}
-
-#nagenawafill-toggle:active {
-  background-color: #dd0101;
-  color: #fff;
-  font-weight: bold;
-  outline: 2px solid #000;
-}
-#nagenawafill-toggle .onoff {
-  font-weight: bold;
-  font-family: sans-serif;
-}
-/* ───────── 表示切り替えボタン ───────── */
-.visibility-button {
-  font-size: 0.9em;
-  margin-right: 0;
-    margin-left: auto;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-}
-
-
-
-/* レイヤー検索窓 */
-#layer-search-wrapper {
-  border: 2px solid #000;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-  padding: 2px;
-  background: #eee;
-}
-
-#layer-search {
-  flex: 1;
-  font-size: 15px;
-  padding: 4px;
-  border: 1px none;
-  box-sizing: border-box;
-}
-
-#layer-search-clear {
-  padding: 2px 6px;
-  font-size: 0.9em;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-}
-
-/* dimmed: 検索に引っかからないレイヤーを半透明に */
-.dimmed {
-  opacity: 0.5;
-}
-
-/* 検索結果全体の表示パネル */
-#search-results-panel {
-  position: relative;
-  width: 100%;
-  max-height: 150px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  background: #f0f0f0;
-  box-sizing: border-box;
-  border: none;
-  border-radius: 4px;
-  padding: 4px;
-  margin-top: 4px;
-}
-
-/* 各検索ヒットアイテムのスタイル */
-.search-result-item {
-  font-size: 60%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: pointer;
-  padding: 4px 6px;
-  margin-bottom: 2px;
-  border: 1px solid transparent;
-}
-
-.search-result-item:hover {
-  color: #fff;
-  background: #0159dd;
-  border-color: #0159dd;
-}
-
-/* レイヤー全体のコンテナ：基準になる親 */
-#layer-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%; /* ← 親の高さ前提で伸ばす */
-  overflow: hidden;
-  position: relative;
-}
-
-
+.search-result-item:hover{color:#fff;background:#0159dd;border-color:#0159dd;}

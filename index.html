@@ -19,8 +19,8 @@
   <div id="layer-container">
     <div id ="layer-container-buttons">
       <button id="add-layer">新規レイヤー</button>
-      <button id="add-layer-name">名前を付けて<br>新規レイヤー</button>
-      <button id="add-layer-same-tags">同じタグで<br>新規レイヤー</button>
+      <button id="add-layer-name">名前を付けて新規レイヤー</button>
+      <button id="add-layer-same-tags">同じタグで新規レイヤー</button>
     </div>
 
   <div id="layer-panel"></div>
@@ -450,6 +450,10 @@ class LayerManager {
     });
 
     this.updateActiveHighlight();
+    //検索結果の更新
+    const searchInput = document.getElementById("layer-search");
+    const currentKeyword = searchInput?.value ?? "";
+    this.renderSearchResults(currentKeyword);
   }
 
   /* --- アクティブ行のハイライト更新 ----------------------------- */
@@ -1022,8 +1026,8 @@ function resizeCanvases() {
   manager.layers.forEach(layer => applyBrushStyle(layer.ctx));  //contextがresizeで消えるので再適用
   updateBrushColor(); // カラーピッカーの初期化
   appHistory.reset();
-  manager.addLayer();
-  manager.addLayer();//for test
+  //manager.addLayer();
+  //manager.addLayer();//for test
   DM = new DrawManager(wrapper, manager);
 });
 
