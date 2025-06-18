@@ -13,6 +13,8 @@
   10. Drag-and-Drop Visuals
   11. Undo/Redo Buttons
   12. 投げなわ塗り
+  13. toggle visiblity
+  14. レイヤー検索窓
   ==================================================== */
 
 @charset "UTF-8";
@@ -173,7 +175,7 @@ canvas {
   color: #fff;
   border-radius: 4px;
   cursor: pointer;
-  margin-left: auto;
+  margin-left: 4px;
   text-align: center;
 }
 .delete-button:hover {
@@ -254,5 +256,35 @@ canvas {
 #nagenawafill-toggle .onoff {
   font-weight: bold;
   font-family: sans-serif;
+}
+/* ───────── 表示切り替えボタン ───────── */
+.visibility-button {
+  font-size: 0.9em;
+  margin-right: 0;
+    margin-left: auto;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+
+
+/*レイヤー検索窓*/
+#layer-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+#layer-search {
+  flex: 1;
+}
+#layer-search-clear {
+  padding: 2px 6px;
+  font-size: 0.9em;
+  cursor: pointer;
+}
+.layer-item.dimmed {
+  opacity: 0.4; /* ← 半透明 */
 }
 

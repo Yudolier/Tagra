@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>TaGra-mini</title>
+  <title>TaGra</title>
   <link rel="stylesheet" href="mini_base.css">
 </head>
 <body>
-  <p id="title">TaGra-mini</p>
+  <p id="title">TaGra</p>
   <!--キャンバス-->
 <div id="workspace">
   <div id="container">
@@ -19,6 +19,11 @@
   <div id="layer-container">
     <button id="add-layer">新規レイヤー</button>
     <button id="add-layer-from-tags">新規レイヤー<br>（タグから）</button>
+    <div id="layer-search-wrapper">
+  <input type="text" id="layer-search" placeholder="レイヤー名で検索…" />
+  <button id="layer-search-clear">×</button>
+</div>
+
     <div id="layer-panel"></div>
   </div>
 
@@ -90,9 +95,21 @@ const cursorCtx = cursorCanvas.getContext("2d", { willReadFrequently: true });  
 class Layer {
   constructor(name) {
     this.name = name;
+    //命名をタグ代わりにして、規則に従って整理する
+    this.nameParts = name.split(/[/_,、]/).map(s => s.trim()).filter(s => s);
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d", { willReadFrequently: true });
-    this.visible = true;
+    this._visible = true; //内部変数として扱うときは"_"
+    this.canvas.style.display = "block"; // 初期表示
+  }
+//ゲッター
+  get visible() {
+    return this._visible;
+  }
+//setは変数が変わった時に自動的に呼ばれる関数→表示/非表示切り替えを同時に行えるのはセッターを介するから
+  set visible(v) {
+    this._visible = v;
+    this.canvas.style.display = v ? "block" : "none"; // ← 表示/非表示を自動切替
   }
 }
 /* ===================== LayerManager ===================== */
@@ -183,6 +200,8 @@ class LayerManager {
     if (!layer || layer.name === newName) return;
     const oldName = layer.name;
     layer.name = newName;
+    layer.nameParts = newName.split(/[/_,、]/).map(s => s.trim()).filter(s => s); // 内部更新だけ追加！
+
     this.renderLayerPanel();
 
     if (!skipHistory) {
@@ -223,11 +242,10 @@ class LayerManager {
 
   /* --- 可視/不可視 ------------------------------------------------ */
   toggleVisibility(index) {
-    const layer = this.layers[index];
-    if (!layer) return;
-    layer.visible = !layer.visible;
-    layer.canvas.style.display = layer.visible ? "block" : "none";
-  }
+  const layer = this.layers[index];
+  layer.visible = !layer.visible;  // ← setter が display 切り替えてくれる♡
+}
+
 
   /* --- 複製 ------------------------------------------------------- */
   duplicateLayer(index) {
@@ -301,7 +319,7 @@ class LayerManager {
       if (idx === this.AI) item.classList.add("active-layer");
       item.setAttribute("draggable", true);
 
-      // 名前
+      // 名前欄
       const nameSpan = document.createElement("span");
       nameSpan.className = "layer-name";
       nameSpan.textContent = layer.name;
@@ -357,6 +375,18 @@ class LayerManager {
         this.removeLayer(idx);
       });
 
+      // ✅ 可視状態トグルボタン
+      const visBtn = document.createElement("button");
+      visBtn.className = "visibility-button";
+      visBtn.textContent = layer.visible ? "✅" : "🚫";
+      visBtn.title = layer.visible ? "非表示にする" : "表示する";
+
+      visBtn.addEventListener("click", e => {
+        e.stopPropagation();
+        this.toggleVisibility(idx);
+        this.renderLayerPanel(); // 再描画でボタン状態更新♡
+      });
+
       // ドラッグ開始／終了
       item.addEventListener("dragstart", e => {
         draggedIdx = idx;
@@ -371,6 +401,7 @@ class LayerManager {
 
       // 逆順表示
       item.appendChild(nameSpan);
+      item.appendChild(visBtn);
       item.appendChild(del);
       panel.prepend(item);
     });
@@ -883,19 +914,84 @@ function resizeCanvases() {
 
 // キーボードショートカットで undo / redo を実行
 window.addEventListener("keydown", e => {
-  if (e.ctrlKey && !e.shiftKey && e.key === "z") {
-    // Ctrl + Z → Undo
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+    // Ctrl + Z または Cmd + Z → Undo
     appHistory.undo();
     e.preventDefault();  // ブラウザの元の動作（戻る）を無効化
   }
 
-  if ((e.ctrlKey && e.key === "y") || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "z")) {
-    // Ctrl + Y または Ctrl + Shift + Z → Redo
+  if (
+    ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") || // Ctrl/Cmd + Y
+    ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z") // Ctrl/Cmd + Shift + Z
+  ) {
+    // Redo 処理
     appHistory.redo();
     e.preventDefault();  // ブラウザの動作（再読み込みなど）を防止
   }
 });
 
+
 </script>
+
+<script>
+//検索スクリプト
+// ── ① クエリパーサー ──
+function parseSearchQuery(raw) {
+  const s = raw.trim().toLowerCase();
+  if (!s) return [];
+  // “or”で大区切り → 各要素を“and”で小区切り
+  return s.split(/\s+or\s+/i)
+          .map(orPart =>
+            orPart.split(/\s+and\s+/i)
+                  .map(tok => tok.trim())
+                  .filter(tok => tok)
+          );
+}
+
+// ── ② LayerManager に updateSearch を追加 ──
+// すでに LayerManager 定義済みなら、下記だけコピペでOKです
+LayerManager.prototype.updateSearch = function(rawKeyword) {
+  const clauses = parseSearchQuery(rawKeyword);
+  const panel   = document.getElementById("layer-panel");
+  const items   = panel.querySelectorAll(".layer-item");
+  const n       = this.layers.length;
+
+  items.forEach((item, visIdx) => {
+    const idx   = n - 1 - visIdx;
+    const layer = this.layers[idx];
+    const hay   = [ layer.name.toLowerCase(), ...layer.nameParts.map(p => p.toLowerCase()) ];
+    let hit;
+
+    if (clauses.length === 0) {
+      hit = true;
+    } else {
+      hit = clauses.some(andList =>
+        andList.every(token =>
+          hay.some(field => field.includes(token))
+        )
+      );
+    }
+
+    // クラス付けで半透明制御
+    if (hit) {
+      item.classList.remove("dimmed");
+    } else {
+      item.classList.add("dimmed");
+    }
+  });
+};
+
+// ── ③ イベントリスナ登録 ──
+document.getElementById("layer-search").addEventListener("input", e => {
+  manager.updateSearch(e.target.value);
+});
+
+document.getElementById("layer-search-clear").addEventListener("click", () => {
+  const input = document.getElementById("layer-search");
+  input.value = "";
+  manager.updateSearch("");
+});
+</script>
+
 </body>
 </html>
