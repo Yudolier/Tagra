@@ -915,6 +915,7 @@ modeToggle.addEventListener('click', () => {
     toolMgr.select("brush");
     modeToggle.textContent = "消しゴムに切り替え";
   }
+  toolMgr.applyStyleTo(manager.getActiveLayer()?.ctx);
 });
 //初期化
 modeToggle.textContent = "消しゴムに切り替え";
@@ -1053,6 +1054,10 @@ window.addEventListener("keydown", e => {
     // Redo 処理
     appHistory.redo();
     e.preventDefault();  // ブラウザの動作（再読み込みなど）を防止
+  }
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "e") {
+    e.preventDefault();  // ブラウザの「検索」などを防止
+    modeToggle.click(); // 既存ボタンを使って切り替えちゃいましょ♡
   }
 });
 
