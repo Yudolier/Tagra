@@ -17,9 +17,11 @@
     <canvas id="cursorCanvas">カーソルキャンバス</canvas>
   </div>
   <div id="layer-container">
-    <button id="add-layer">新規レイヤー</button>
-    <button id="add-layer-from-tags">名前を付けて<br>新規レイヤー</button>
-    <button id="add-layer-from-tags">同じタグで<br>新規レイヤー</button>
+    <div id ="layer-container-buttons">
+      <button id="add-layer">新規レイヤー</button>
+      <button id="add-layer-name">名前を付けて<br>新規レイヤー</button>
+      <button id="add-layer-same-tags">同じタグで<br>新規レイヤー</button>
+    </div>
 
   <div id="layer-panel"></div>
   <div id="layer-search-wrapper">
@@ -81,7 +83,8 @@ const cursorCtx = cursorCanvas.getContext("2d", { willReadFrequently: true });  
   const eraserDecreaseBtn = document.getElementById('eraser-decrease');
   const eraserIncreaseBtn = document.getElementById('eraser-increase');
   const addLayerBtn = document.getElementById("add-layer");
-  const addLayerFTBtn = document.getElementById("add-layer-from-tags");
+  const addLayerNameBtn = document.getElementById('add-layer-name');
+  const addLayerSTBtn = document.getElementById("add-layer-same-tags");
   const undoButton = document.getElementById("undo-button");
   const redoButton = document.getElementById("redo-button");
   //レイヤーに関連する変数(旧)
@@ -788,10 +791,72 @@ addLayerBtn.addEventListener("click", () => {
   console.log("add-layer pushed!");
   manager.addLayer()
 });
-addLayerFTBtn.addEventListener("click", () => {
-  console.log("add-layer-from-tags pushed!");
+
+//レイヤー追加と同時に命名
+addLayerNameBtn.addEventListener('click', () => {
+  // 1) 新規レイヤーを追加してインデックス取得
+  const newLayer   = manager.addLayer();      // addLayer は末尾に追加済み
+  const newIdx     = manager.layers.length - 1;
+
+  // 2) 直後にアクティブに
+  manager.setActive(newIdx);
+
+  // 3) レイヤー項目の <span.layer-name> を探す
+  const row = document.querySelector(`#layer-panel .layer-item[data-index="${newIdx}"]`);
+  if (!row) return;
+  const nameSpan = row.querySelector('.layer-name');
+  if (!nameSpan) return;
+
+  // 4) rename の <input> を生成して即フォーカス
+  const input = document.createElement('input');
+  input.type  = 'text';
+  input.value = newLayer.name;
+  input.className = 'rename-input';
+
+  // Enter / Esc / blur のハンドリング
+  const finish = ok => {
+    if (ok) manager.renameLayer(newIdx, input.value.trim() || newLayer.name);
+    manager.renderLayerPanel();
+  };
+
+input.addEventListener('keydown', e => {
+  /* IME 変換中（isComposing=true）の Enter は無視 */
+  if (e.key === 'Enter' && !e.isComposing) {
+    finish(true);            // ← 1回で確定！
+  }
+  if (e.key === 'Escape') {
+    finish(false);           // Esc は従来どおり
+  }
 });
 
+  input.addEventListener('blur', () => finish(true));
+
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+});
+
+//同一タグでレイヤーの追加
+addLayerSTBtn.addEventListener("click", () => {
+  console.log("add-layer-same-tags pushed!");
+  const active = manager.getActiveLayer();
+  if (!active) return;
+
+  // nameParts（['髪','線画'] or ['髪','線画','2']）などをコピー
+  const parts = [...active.nameParts];
+  let num = 1;
+
+  // 末尾が数字なら取り出して配列から削除
+  const last = parts[parts.length - 1];
+  if (/^\d+$/.test(last)) {
+    num = parseInt(last, 10);
+    parts.pop();
+  }
+
+  // 新しい名前を作って追加！
+  const newName = parts.join('_') + '_' + (num + 1);
+  manager.addLayer(newName);
+});
 brushWidthSlider.addEventListener('input', () => {
   const size = +brushWidthSlider.value;
 
