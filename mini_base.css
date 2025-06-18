@@ -104,16 +104,20 @@ canvas {
 /* ───────── Layer Panel & Items ───────── */
 #layer-container {
   max-width: 250px;
+  max-height: 450px;
   background-color: #f0f0f0;
   border: 2px solid #000;
 }
+#layer-container button{
+  font-size: 15px;
+}
 #layer-panel {
   flex: 1;
-  max-height: 300px;
+  height: 200px;
+  overflow-y: auto;
   background-color: #f0f0f0;
   border-left: 1px solid #ccc;
   padding: 10px;
-  overflow-y: auto;
   scrollbar-gutter: stable;
 }
 .layer-item {
@@ -207,7 +211,7 @@ canvas {
 
 /* ───────── Drag-and-Drop Visuals ───────── */
 .layer-item.dragging { opacity: 0.5; }
-.layer-item.drag-over { outline: 2px dashed #888; }
+.layer-item.drag-over { border: none;}
 .drop-indicator {
   height: 0;
   border-top: 5px solid rgb(255, 0, 140);
@@ -269,22 +273,78 @@ canvas {
 
 
 
-/*レイヤー検索窓*/
+/* レイヤー検索窓 */
 #layer-search-wrapper {
+  border: 2px solid #000;
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 4px;
+  padding: 2px;
+  background: #eee;
 }
+
 #layer-search {
   flex: 1;
+  font-size: 15px;
+  padding: 4px;
+  border: 1px none;
+  box-sizing: border-box;
 }
+
 #layer-search-clear {
   padding: 2px 6px;
   font-size: 0.9em;
   cursor: pointer;
+  border: none;
+  background: transparent;
 }
-.layer-item.dimmed {
-  opacity: 0.4; /* ← 半透明 */
+
+/* dimmed: 検索に引っかからないレイヤーを半透明に */
+.dimmed {
+  opacity: 0.5;
 }
+
+/* 検索結果全体の表示パネル */
+#search-results-panel {
+  position: relative;
+  width: 100%;
+  max-height: 150px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #f0f0f0;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  margin-top: 4px;
+}
+
+/* 各検索ヒットアイテムのスタイル */
+.search-result-item {
+  font-size: 60%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-bottom: 2px;
+  border: 1px solid transparent;
+}
+
+.search-result-item:hover {
+  color: #fff;
+  background: #0159dd;
+  border-color: #0159dd;
+}
+
+/* レイヤー全体のコンテナ：基準になる親 */
+#layer-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* ← 親の高さ前提で伸ばす */
+  overflow: hidden;
+  position: relative;
+}
+
 

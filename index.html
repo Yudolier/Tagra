@@ -18,13 +18,17 @@
   </div>
   <div id="layer-container">
     <button id="add-layer">新規レイヤー</button>
-    <button id="add-layer-from-tags">新規レイヤー<br>（タグから）</button>
-    <div id="layer-search-wrapper">
-  <input type="text" id="layer-search" placeholder="レイヤー名で検索…" />
-  <button id="layer-search-clear">×</button>
-</div>
+    <button id="add-layer-from-tags">名前を付けて<br>新規レイヤー</button>
+    <button id="add-layer-from-tags">同じタグで<br>新規レイヤー</button>
 
-    <div id="layer-panel"></div>
+  <div id="layer-panel"></div>
+  <div id="layer-search-wrapper">
+    <input type="text" id="layer-search" placeholder="レイヤー検索(and,or対応)" />
+    <button id="layer-search-clear">×</button>
+  </div>
+
+  <div id="search-results-panel"></div>
+
   </div>
 
 </div>
@@ -452,6 +456,52 @@ class LayerManager {
     items.forEach((row, i) => {
       const logicalIdx = n - 1 - i; // prepend 表示なので反転
       row.classList.toggle("active-layer", logicalIdx === this.AI);
+    });
+  }
+    /* --- 検索ヒットを半透明化するメソッド（旧 updateSearch） --- */
+  updateSearch(rawKeyword) {
+    const clauses = parseSearchQuery(rawKeyword);
+    const panel   = document.getElementById("layer-panel");
+    const items   = panel.querySelectorAll(".layer-item");
+    const n       = this.layers.length;
+
+    items.forEach((item, visIdx) => {
+      const idx   = n - 1 - visIdx;
+      const layer = this.layers[idx];
+      const hay   = [layer.name.toLowerCase(), ...layer.nameParts.map(p => p.toLowerCase())];
+      const hit   = clauses.length === 0
+                  ? true
+                  : clauses.some(andList =>
+                      andList.every(token =>
+                        hay.some(f => f.includes(token))
+                      )
+                    );
+      item.classList.toggle("dimmed", !hit);
+    });
+  }
+
+  /* --- 検索ヒットしたレイヤーだけ別枠に表示するメソッド（旧 renderSearchResults） --- */
+  renderSearchResults(rawKeyword) {
+    const clauses = parseSearchQuery(rawKeyword);
+    const panel   = document.getElementById("search-results-panel");
+    panel.innerHTML = "";
+
+    if (clauses.length === 0) return;
+
+    this.layers.forEach((layer, idx) => {
+      const hay = [layer.name.toLowerCase(), ...layer.nameParts.map(p => p.toLowerCase())];
+      const hit = clauses.some(andList =>
+        andList.every(token =>
+          hay.some(f => f.includes(token))
+        )
+      );
+      if (!hit) return;
+
+      const div = document.createElement("div");
+      div.className = "search-result-item";
+      div.textContent = layer.name;
+      div.addEventListener("click", () => this.setActive(idx));
+      panel.appendChild(div);
     });
   }
 }
@@ -934,12 +984,12 @@ window.addEventListener("keydown", e => {
 </script>
 
 <script>
-//検索スクリプト
-// ── ① クエリパーサー ──
+// ========== 検索機能（layer name AND/OR 検索対応） ==========
+
+// ── クエリパーサー（"光 and 影 or ラフ" → [["光","影"],["ラフ"]]）──
 function parseSearchQuery(raw) {
   const s = raw.trim().toLowerCase();
   if (!s) return [];
-  // “or”で大区切り → 各要素を“and”で小区切り
   return s.split(/\s+or\s+/i)
           .map(orPart =>
             orPart.split(/\s+and\s+/i)
@@ -948,50 +998,22 @@ function parseSearchQuery(raw) {
           );
 }
 
-// ── ② LayerManager に updateSearch を追加 ──
-// すでに LayerManager 定義済みなら、下記だけコピペでOKです
-LayerManager.prototype.updateSearch = function(rawKeyword) {
-  const clauses = parseSearchQuery(rawKeyword);
-  const panel   = document.getElementById("layer-panel");
-  const items   = panel.querySelectorAll(".layer-item");
-  const n       = this.layers.length;
-
-  items.forEach((item, visIdx) => {
-    const idx   = n - 1 - visIdx;
-    const layer = this.layers[idx];
-    const hay   = [ layer.name.toLowerCase(), ...layer.nameParts.map(p => p.toLowerCase()) ];
-    let hit;
-
-    if (clauses.length === 0) {
-      hit = true;
-    } else {
-      hit = clauses.some(andList =>
-        andList.every(token =>
-          hay.some(field => field.includes(token))
-        )
-      );
-    }
-
-    // クラス付けで半透明制御
-    if (hit) {
-      item.classList.remove("dimmed");
-    } else {
-      item.classList.add("dimmed");
-    }
-  });
-};
-
-// ── ③ イベントリスナ登録 ──
+// ── 入力イベント：検索欄の入力でレイヤーパネル更新 ──
 document.getElementById("layer-search").addEventListener("input", e => {
-  manager.updateSearch(e.target.value);
+  const q = e.target.value;
+  manager.updateSearch(q);
+  manager.renderSearchResults(q);
 });
 
+// ── クリアボタン：検索欄リセット ──
 document.getElementById("layer-search-clear").addEventListener("click", () => {
   const input = document.getElementById("layer-search");
   input.value = "";
   manager.updateSearch("");
+  manager.renderSearchResults("");
 });
 </script>
+
 
 </body>
 </html>
